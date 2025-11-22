@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tennis Pro-Set Tracker (No-Ad, Up to 8 Games)</title>
+    <title>Flexible Tennis Score Tracker (No-Ad)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter Font -->
@@ -22,29 +22,22 @@
             overflow-y: auto;
             scrollbar-width: thin;
         }
-        /* Custom styles to hide unused set columns */
         .set-column {
-            display: none !important; 
+            width: 15%; 
         }
-        .pro-set-column {
-            width: 20%; 
-            display: table-cell !important;
-        }
-        /* Ensure table adapts well on small screens */
-        @media (min-width: 640px) {
-            .pro-set-column {
-                width: 15%; 
-            }
+        .match-end-status {
+            font-size: 1.5rem;
+            font-weight: 800;
         }
     </style>
 </head>
 <body class="p-4">
 
-    <div id="app" class="w-full max-w-3xl bg-white shadow-2xl rounded-xl p-6 md:p-10 border border-gray-100">
+    <div id="app" class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-6 md:p-10 border border-gray-100">
 
         <!-- Header and Status -->
         <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 text-center mb-2 tracking-tight">
-            Single Pro-Set Scoreboard (No-Ad)
+            Flexible Tennis Scoreboard (No-Ad)
         </h1>
         <p id="match-status" class="text-center text-lg mb-4 font-semibold text-green-600 transition duration-300">
             Initializing...
@@ -66,27 +59,30 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:w-2/5">Player</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider pro-set-column">Games</th>
-                        <!-- Set 2 & 3 columns are now hidden for Pro-Set -->
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider set-column">Set 2</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider set-column">Set 3</th>
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:w-1/3">Player</th>
+                        <th id="set1-header" class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider set-column">Set 1</th>
+                        <th id="set2-header" class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider set-column">Set 2</th>
+                        <th id="set3-header" class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider set-column">Set 3</th>
                         <th class="px-3 py-3 text-center text-sm font-bold text-gray-700 uppercase tracking-wider w-1/4 bg-gray-200">Game Score</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <!-- Player 1 Row -->
                     <tr>
-                        <td id="p1-name" class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Player 1</td>
-                        <td id="p1-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 pro-set-column">0</td>
+                        <td id="p1-name" class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center">
+                            Player 1 <span id="p1-server-icon" class="ml-2 text-xl hidden">🎾</span>
+                        </td>
+                        <td id="p1-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p1-set2" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p1-set3" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p1-game-score" class="px-3 py-4 whitespace-nowrap text-base font-bold text-center bg-green-50 text-green-700">Love</td>
                     </tr>
                     <!-- Player 2 Row -->
                     <tr>
-                        <td id="p2-name" class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Player 2</td>
-                        <td id="p2-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 pro-set-column">0</td>
+                        <td id="p2-name" class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center">
+                            Player 2 <span id="p2-server-icon" class="ml-2 text-xl hidden">🎾</span>
+                        </td>
+                        <td id="p2-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p2-set2" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p2-set3" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p2-game-score" class="px-3 py-4 whitespace-nowrap text-base font-bold text-center bg-red-50 text-red-700">Love</td>
@@ -139,37 +135,85 @@
             </button>
         </div>
 
+        <!-- Utility Buttons -->
+        <div class="mt-6 flex flex-col md:flex-row justify-center gap-4 border-t pt-4">
+            <button onclick="showMatchAnalyticsModal()" id="btn-analytics" disabled
+                class="px-8 py-3 bg-teal-500 text-white font-medium rounded-lg shadow-sm hover:bg-teal-600 transition duration-200 focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:bg-gray-400">
+                View Match Analytics
+            </button>
+            <button onclick="showMatchHistoryModal()" id="btn-history" disabled
+                class="px-8 py-3 bg-indigo-500 text-white font-medium rounded-lg shadow-sm hover:bg-indigo-600 transition duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-400">
+                View Match History
+            </button>
+            <button onclick="resetMatch()"
+                class="px-8 py-3 bg-gray-200 text-gray-800 font-medium rounded-lg shadow-sm hover:bg-gray-300 transition duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                Start New Match
+            </button>
+        </div>
+        
         <!-- Point Log Section -->
         <div class="mt-8">
             <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Match History Log</h3>
             <div id="point-log" class="log-container space-y-2 p-3 bg-gray-50 rounded-lg border">
-                <!-- Log entries will appear here -->
                 <p class="text-sm text-gray-500">No points recorded yet. Hit a point button to start logging!</p>
             </div>
         </div>
 
-        <!-- Reset Button -->
-        <div class="mt-6 text-center">
-            <button onclick="resetMatch()"
-                class="w-full md:w-auto px-8 py-3 bg-gray-200 text-gray-800 font-medium rounded-lg shadow-sm hover:bg-gray-300 transition duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400">
-                Start New Match
-            </button>
-        </div>
-
-        <!-- Input Modal (Hidden by Default) -->
+        <!-- Input Modal (Name/Format Entry - Hidden by Default) -->
         <div id="modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-4 text-gray-800" id="modal-title">Enter Names</h3>
+            <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+                <h3 class="text-xl font-bold mb-4 text-gray-800" id="modal-title">Start New Match</h3>
                 <div class="space-y-4">
                     <input type="text" id="p1-input" placeholder="Player 1 Name (e.g., Nadal)"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     <input type="text" id="p2-input" placeholder="Player 2 Name (e.g., Djokovic)"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    
+                    <h4 class="font-semibold pt-2">Select Match Format:</h4>
+                    <div class="flex flex-col space-y-2">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="match-format" value="pro-set" checked
+                                class="form-radio h-5 w-5 text-indigo-600">
+                            <span class="ml-2 text-gray-700">Single 8-Game Pro-Set (Tie-break at 8-8)</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="match-format" value="best-of-3"
+                                class="form-radio h-5 w-5 text-indigo-600">
+                            <span class="ml-2 text-gray-700">Best-of-3 Sets (6 games per set, Tie-break at 6-6)</span>
+                        </label>
+                    </div>
                 </div>
                 <button onclick="saveNames()"
                     class="mt-6 w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200">
                     Start Match
                 </button>
+            </div>
+        </div>
+
+        <!-- Match History Modal -->
+        <div id="history-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg md:max-h-[90vh] overflow-y-auto">
+                <h3 class="text-2xl font-bold mb-4 text-gray-800 flex justify-between items-center">
+                    Match History
+                    <button onclick="closeMatchHistoryModal()" class="text-gray-500 hover:text-gray-800 text-xl font-bold">&times;</button>
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">Click any match below to load and review the score.</p>
+                <div id="match-list" class="space-y-3">
+                    <p class="text-center text-gray-400">Loading matches...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Match Analytics Modal -->
+        <div id="analytics-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xl md:max-h-[90vh] overflow-y-auto">
+                <h3 class="text-2xl font-bold mb-4 text-gray-800 flex justify-between items-center">
+                    Match Analytics
+                    <button onclick="closeMatchAnalyticsModal()" class="text-gray-500 hover:text-gray-800 text-xl font-bold">&times;</button>
+                </h3>
+                <div id="analytics-content">
+                    <p class="text-center text-gray-500">Analytics will appear here after points are scored.</p>
+                </div>
             </div>
         </div>
 
@@ -190,12 +234,11 @@
         };
 
         // 2. Check if the environment variables are available (for running in the Canvas environment).
-        //    If not, we default to the manual configuration.
         const IS_ENV_CONFIG_AVAILABLE = typeof __firebase_config !== 'undefined' && JSON.parse(__firebase_config).projectId;
         const IS_MANUAL_CONFIG_AVAILABLE = MANUAL_FIREBASE_CONFIG.projectId && MANUAL_FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY_HERE";
 
 
-        let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, setLogLevel;
+        let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, setLogLevel, collection, query, where, getDocs;
 
         if (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) {
             // Dynamically import Firebase only if we have the configuration
@@ -213,6 +256,10 @@
             setDoc = firestoreModules.setDoc;
             onSnapshot = firestoreModules.onSnapshot;
             setLogLevel = firestoreModules.setLogLevel;
+            collection = firestoreModules.collection;
+            query = firestoreModules.query;
+            where = firestoreModules.where;
+            getDocs = firestoreModules.getDocs;
 
             setLogLevel('Debug');
         }
@@ -229,9 +276,8 @@
         let matchState = {
             p1Name: 'Player 1',
             p2Name: 'Player 2',
-            // Only one set for Pro-Set
             sets: [
-                { p1: 0, p2: 0 }
+                { p1: 0, p2: 0 } 
             ],
             currentSetIndex: 0,
             p1Points: 0,
@@ -239,15 +285,32 @@
             isTieBreak: false,
             tieBreakScore: { p1: 0, p2: 0 },
             matchStatus: 'Ongoing',
-            maxSets: 1, // Changed from 3 to 1
-            history: [], // Stores previous full matchState objects for undo
-            matchId: 'new-match', // Default ID, will be replaced by user ID or query param
+            matchFormat: 'pro-set', // 'pro-set' or 'best-of-3'
+            currentServer: 1, // 1 or 2
+            history: [], 
+            matchId: 'new-match', 
             userId: 'local-user-id'
         };
 
         const POINT_MAP = ['Love', '15', '30', '40'];
         const MATCH_COLLECTION = `artifacts/${appId}/public/data/tennis_matches`;
-        const PRO_SET_WIN_GAMES = 8; // Define Pro-Set win condition (8 games)
+
+        // --- Utility Functions ---
+
+        function getMatchConfig(format) {
+            if (format === 'pro-set') {
+                return { 
+                    maxSets: 1, 
+                    winGames: 8, 
+                    tieBreakGame: 8 
+                };
+            }
+            return { // best-of-3
+                maxSets: 3, 
+                winGames: 6, 
+                tieBreakGame: 6
+            };
+        }
 
         // --- Firebase Initialization and Authentication ---
 
@@ -260,6 +323,8 @@
                 document.getElementById('user-id-display').textContent = 'Local User';
                 showModal();
                 enableButtons();
+                document.getElementById('btn-history').disabled = true;
+                document.getElementById('btn-analytics').disabled = true;
                 return;
             }
 
@@ -271,7 +336,6 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const urlMatchId = urlParams.get('matchId');
                 
-                // AUTHENTICATION LOGIC: Use Canvas token if available, otherwise sign in anonymously
                 if (initialAuthToken && IS_ENV_CONFIG_AVAILABLE) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
@@ -284,16 +348,15 @@
                         document.getElementById('user-id-display').textContent = currentUserId;
                         matchState.userId = currentUserId;
                         
-                        // Use URL match ID if present, otherwise default to the user's ID
                         matchState.matchId = urlMatchId || currentUserId;
                         document.getElementById('match-id-display').textContent = matchState.matchId;
 
                         setupRealtimeListener();
-                        // Only show modal if P1 name is default AND we are not loading a shared match
-                        if (matchState.p1Name === 'Player 1' && !urlMatchId) {
-                            showModal();
-                        }
+
                         enableButtons();
+                        document.getElementById('btn-history').disabled = false;
+                        document.getElementById('btn-analytics').disabled = false;
+
                     } else {
                         console.error("Authentication failed: User is null after sign-in.");
                         document.getElementById('match-status').textContent = 'Error: Authentication failed.';
@@ -309,7 +372,7 @@
         // --- Data Persistence (Firestore) ---
 
         function setupRealtimeListener() {
-            if (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE) return; // Skip if in local mode
+            if (!db || !matchState.matchId) return;
 
             if (unsubscribeMatchListener) {
                 unsubscribeMatchListener();
@@ -320,14 +383,13 @@
             unsubscribeMatchListener = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists() && docSnap.id === matchState.matchId) {
                     const data = docSnap.data();
-                    // Load data if it's from another user, or if current user hasn't set names yet
                     if (data.userId !== matchState.userId || matchState.p1Name === 'Player 1') { 
                         loadMatchState(data);
                         updateMatchStatus(`Match loaded from database! ID: ${matchState.matchId}`);
                     }
-                } else {
+                } else if (matchState.matchId.length > 30 || matchState.matchId === currentUserId) { 
                     saveMatchState();
-                    updateMatchStatus('New match document created.');
+                    updateMatchStatus('Match document created/updated.');
                 }
             }, (error) => {
                 console.error("Firestore listen failed:", error);
@@ -341,19 +403,33 @@
                 return;
             }
 
-            if (!db || !matchState.matchId) return;
+            if (!db || !matchState.matchId) return; 
 
             const docRef = doc(db, MATCH_COLLECTION, matchState.matchId);
+            
+            // Prepare sets for saving (only up to current set)
+            const setsToSave = matchState.sets.map(set => ({ p1: set.p1, p2: set.p2 }));
+
             const stateToSave = {
-                ...matchState,
-                history: matchState.history.slice(-100), 
+                p1Name: matchState.p1Name,
+                p2Name: matchState.p2Name,
+                sets: setsToSave,
+                currentSetIndex: matchState.currentSetIndex,
+                p1Points: matchState.p1Points,
+                p2Points: matchState.p2Points,
+                isTieBreak: matchState.isTieBreak,
+                tieBreakScore: matchState.tieBreakScore,
+                matchStatus: matchState.matchStatus,
+                matchFormat: matchState.matchFormat,
+                currentServer: matchState.currentServer,
+                history: matchState.history.slice(-100), // Keep history size manageable
                 lastUpdated: Date.now(),
-                userId: currentUserId
+                userId: currentUserId,
+                setScore: setsToSave.map(s => `${s.p1}-${s.p2}`).join(', ')
             };
 
             try {
                 document.getElementById('save-status').textContent = 'Saving...';
-                // Implement exponential backoff for the API call
                 const maxRetries = 5;
                 let delay = 1000;
 
@@ -361,13 +437,13 @@
                     try {
                         await setDoc(docRef, stateToSave);
                         document.getElementById('save-status').textContent = 'Saved!';
-                        return; // Success, exit function
+                        return;
                     } catch (error) {
                         if (i < maxRetries - 1) {
                             await new Promise(resolve => setTimeout(resolve, delay));
-                            delay *= 2; // Exponential backoff
+                            delay *= 2;
                         } else {
-                            throw error; // Re-throw the error after max retries
+                            throw error;
                         }
                     }
                 }
@@ -378,21 +454,233 @@
         }
 
         function loadMatchState(data) {
-            // Apply all non-function properties from data to matchState
             Object.keys(data).forEach(key => {
                 if (key in matchState) {
                     matchState[key] = data[key];
                 }
             });
-            // Ensure sets array matches the maxSets length (1 for Pro-Set)
-            matchState.sets = matchState.sets.slice(0, matchState.maxSets) || [{ p1: 0, p2: 0 }];
+            
+            // Ensure sets array is the correct length for the format
+            const config = getMatchConfig(matchState.matchFormat);
+            while (matchState.sets.length < config.maxSets) {
+                 matchState.sets.push({ p1: 0, p2: 0 });
+            }
+
+            matchState.sets = matchState.sets.slice(0, config.maxSets) || [{ p1: 0, p2: 0 }];
             matchState.history = matchState.history || [];
             matchState.isTieBreak = matchState.isTieBreak || false;
             matchState.tieBreakScore = matchState.tieBreakScore || { p1: 0, p2: 0 };
+            matchState.currentServer = matchState.currentServer || 1;
             
             checkMatchEnd();
             render();
+            
+            // Rebuild the log display from history
+            document.getElementById('point-log').innerHTML = '';
+            if (matchState.history.length === 0) {
+                 document.getElementById('point-log').innerHTML = '<p class="text-sm text-gray-500">No points recorded yet. Hit a point button to start logging!</p>';
+            } else {
+                matchState.history.forEach(state => {
+                    if (state.lastLogEntry) {
+                        displayLogEntry(state.lastLogEntry, true); // Display from history
+                    }
+                });
+            }
         }
+        
+        // --- Match History Functions ---
+
+        window.showMatchHistoryModal = async function() {
+            if (!db) return;
+            document.getElementById('history-modal').style.display = 'flex';
+            document.getElementById('match-list').innerHTML = '<p class="text-center text-gray-400">Loading matches...</p>';
+            await loadMatchList();
+        }
+
+        window.closeMatchHistoryModal = function() {
+            document.getElementById('history-modal').style.display = 'none';
+        }
+
+        async function loadMatchList() {
+             if (!currentUserId) {
+                 document.getElementById('match-list').innerHTML = '<p class="text-center text-red-500">Authentication required to view history.</p>';
+                 return;
+             }
+
+             const matchRef = collection(db, MATCH_COLLECTION);
+             const q = query(matchRef, where("userId", "==", currentUserId));
+
+             try {
+                 const querySnapshot = await getDocs(q);
+                 const matches = [];
+                 querySnapshot.forEach((doc) => {
+                     matches.push({ id: doc.id, ...doc.data() });
+                 });
+
+                 renderMatchList(matches);
+
+             } catch (e) {
+                 console.error("Error loading match list:", e);
+                 document.getElementById('match-list').innerHTML = `<p class="text-center text-red-500">Error fetching history: ${e.message}</p>`;
+             }
+        }
+
+        function renderMatchList(matches) {
+            const listEl = document.getElementById('match-list');
+            listEl.innerHTML = ''; 
+
+            if (matches.length === 0) {
+                listEl.innerHTML = '<p class="text-center text-gray-400">No previous matches found.</p>';
+                return;
+            }
+
+            matches
+                .sort((a, b) => b.lastUpdated - a.lastUpdated)
+                .forEach(match => {
+                    const matchDiv = document.createElement('div');
+                    const formatText = match.matchFormat === 'pro-set' ? 'Pro-Set (8G)' : 'Best-of-3 (6G)';
+                    matchDiv.className = 'p-3 border border-gray-200 rounded-lg shadow-sm hover:bg-indigo-50 cursor-pointer transition duration-150';
+                    matchDiv.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-gray-800">${match.p1Name} vs ${match.p2Name}</span>
+                            <span class="text-sm font-semibold text-indigo-600">${match.setScore || '0-0'}</span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            <span class="mr-3">${formatText}</span> | 
+                            Updated: ${new Date(match.lastUpdated).toLocaleString()}
+                        </div>
+                    `;
+                    matchDiv.onclick = () => {
+                        closeMatchHistoryModal();
+                        window.location.search = `?matchId=${match.id}`;
+                    };
+                    listEl.appendChild(matchDiv);
+                });
+        }
+        
+        // --- Match Analytics Functions ---
+
+        window.showMatchAnalyticsModal = function() {
+            document.getElementById('analytics-modal').style.display = 'flex';
+            renderAnalytics();
+        }
+
+        window.closeMatchAnalyticsModal = function() {
+            document.getElementById('analytics-modal').style.display = 'none';
+        }
+
+        function renderAnalytics() {
+            const history = matchState.history.map(s => s.lastLogEntry).filter(e => e);
+            const p1Name = matchState.p1Name;
+            const p2Name = matchState.p2Name;
+            const contentEl = document.getElementById('analytics-content');
+            contentEl.innerHTML = '';
+
+            if (history.length === 0) {
+                contentEl.innerHTML = '<p class="text-center text-gray-500 py-4">No points recorded to analyze.</p>';
+                return;
+            }
+
+            const p1Stats = calculatePlayerStats(history, 1, p1Name);
+            const p2Stats = calculatePlayerStats(history, 2, p2Name);
+
+            const totalRallies = history.length;
+            const totalRallyLength = history.reduce((sum, entry) => sum + entry.rallyLength, 0);
+            const avgRallyLength = (totalRallyLength / totalRallies).toFixed(2);
+            
+            let html = `
+                <div class="space-y-6">
+                    <div class="text-center p-3 bg-gray-100 rounded-lg">
+                        <p class="text-sm text-gray-600 font-medium">Match Summary</p>
+                        <p class="text-2xl font-bold text-gray-800">${totalRallies} Total Points Played</p>
+                        <p class="text-lg font-semibold text-indigo-600">Avg Rally Length: ${avgRallyLength} shots</p>
+                    </div>
+
+                    ${renderPlayerAnalytics(p1Stats, p1Name, 'bg-green-50', 'text-green-700')}
+                    ${renderPlayerAnalytics(p2Stats, p2Name, 'bg-red-50', 'text-red-700')}
+                </div>
+            `;
+            contentEl.innerHTML = html;
+        }
+
+        function calculatePlayerStats(history, playerId, playerName) {
+            const stats = {
+                won: 0, lost: 0,
+                onServe: 0, wonOnServe: 0,
+                type: { 'W-G': 0, 'W-V': 0, 'W-D': 0, 'UE': 0, 'FE': 0, 'DF': 0 },
+                errors: 0
+            };
+            const opponentId = playerId === 1 ? 2 : 1;
+
+            history.forEach(entry => {
+                const isWinner = entry.winner === playerId;
+                const isLoser = entry.winner === opponentId;
+                const isServer = entry.server === playerId;
+
+                if (isWinner) {
+                    stats.won++;
+                    stats.type[entry.type] = (stats.type[entry.type] || 0) + 1;
+                }
+                
+                if (isLoser) {
+                    stats.lost++;
+                }
+                
+                if (isServer) {
+                    stats.onServe++;
+                    if (isWinner) stats.wonOnServe++;
+                }
+
+                // If the opponent won this point via error from current player
+                if (isLoser) {
+                    if (['UE', 'FE', 'DF'].includes(entry.type)) {
+                         stats.errors++;
+                    }
+                }
+            });
+
+            stats.winPctOnServe = stats.onServe > 0 ? ((stats.wonOnServe / stats.onServe) * 100).toFixed(1) : 0;
+            return stats;
+        }
+
+        function renderPlayerAnalytics(stats, name, bgClass, textClass) {
+            const totalWinners = stats.type['W-G'] + stats.type['W-V'] + stats.type['W-D'];
+            const totalErrors = stats.type['UE'] + stats.type['FE'] + stats.type['DF'];
+
+            return `
+                <div class="p-4 rounded-xl shadow-lg border-2 ${bgClass} border-gray-200">
+                    <h4 class="text-xl font-extrabold mb-3 ${textClass}">${name}'s Performance</h4>
+                    
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+                            <p class="font-bold text-gray-700">Total Points Won</p>
+                            <p class="text-2xl font-extrabold ${textClass}">${stats.won}</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+                            <p class="font-bold text-gray-700">Win % on Serve</p>
+                            <p class="text-2xl font-extrabold ${textClass}">${stats.winPctOnServe}%</p>
+                            <p class="text-xs text-gray-500">(${stats.wonOnServe} of ${stats.onServe})</p>
+                        </div>
+                    </div>
+
+                    <h5 class="font-bold text-gray-700 mt-4 mb-2 border-t pt-2">Point Type Breakdown:</h5>
+                    <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                        ${Object.keys(stats.type).map(key => `
+                            <div class="p-2 bg-white rounded-lg shadow-sm border border-gray-100">
+                                <p class="font-bold text-gray-800">${stats.type[key]}</p>
+                                <p class="text-gray-500">${key}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="mt-4 flex justify-between text-sm font-semibold">
+                        <span>Total Winners: <span class="text-blue-600">${totalWinners}</span></span>
+                        <span>Total Errors: <span class="text-red-600">${totalErrors}</span></span>
+                    </div>
+                </div>
+            `;
+        }
+
 
         // --- Core Scoring Logic ---
 
@@ -400,7 +688,6 @@
             if (matchState.isTieBreak) {
                 return [p1.toString(), p2.toString()];
             }
-            // No-Ad Scoring
             if (p1 === 4) return ['WINS', ''];
             if (p2 === 4) return ['', 'WINS'];
             if (p1 === 3 && p2 === 3) return ['Deciding Point', 'Deciding Point'];
@@ -419,10 +706,12 @@
                 currentSet.p2++;
             }
 
+            // Reset game points, server alternates
             matchState.p1Points = 0;
             matchState.p2Points = 0;
             matchState.isTieBreak = false;
             matchState.tieBreakScore = { p1: 0, p2: 0 };
+            matchState.currentServer = winner === 1 ? 2 : 1; 
 
             checkSetWin();
 
@@ -439,47 +728,72 @@
             } else {
                 tb.p2++;
             }
+            
+            // Server switch in Tie-break: initial serve (1), then switch every 2 points
+            const totalPoints = tb.p1 + tb.p2;
+            if (totalPoints > 1 && totalPoints % 2 === 1) { // 1, 3, 5, 7, ...
+                 matchState.currentServer = matchState.currentServer === 1 ? 2 : 1;
+            }
 
-            // Tie-break win: 7 points, win by 2
             if ((tb.p1 >= 7 && tb.p1 >= tb.p2 + 2) || (tb.p2 >= 7 && tb.p2 >= tb.p1 + 2)) {
+                // Tie-break win also means game win, which also means set win
                 handleGameWin(winner);
                 updateMatchStatus(`Tie-break won by ${matchState['p' + winner + 'Name']}!`);
             }
         }
 
         function checkSetWin() {
+            const config = getMatchConfig(matchState.matchFormat);
             const currentSet = matchState.sets[matchState.currentSetIndex];
             const p1G = currentSet.p1;
             const p2G = currentSet.p2;
 
             let setWinner = null;
+            const winGames = config.winGames;
+            const tieBreakGame = config.tieBreakGame;
 
-            // Pro-Set Win Condition: 8 games, win by 2
-            if (p1G >= PRO_SET_WIN_GAMES && p1G >= p2G + 2) {
+            if (p1G >= winGames && p1G >= p2G + 2) {
                 setWinner = 1;
-            } else if (p2G >= PRO_SET_WIN_GAMES && p2G >= p1G + 2) {
+            } else if (p2G >= winGames && p2G >= p1G + 2) {
                 setWinner = 2;
             }
 
-            // Tie-break Trigger: at 8-8
-            if (!setWinner && p1G === PRO_SET_WIN_GAMES && p2G === PRO_SET_WIN_GAMES) {
+            // Check for tie-break trigger (e.g., 6-6 or 8-8)
+            if (!setWinner && p1G === tieBreakGame && p2G === tieBreakGame) {
                 matchState.isTieBreak = true;
-                updateMatchStatus('The Pro-Set is tied at 8-8. Entering Tie-Break Mode!');
+                updateMatchStatus(`Set is tied at ${tieBreakGame}-${tieBreakGame}. Entering Tie-Break Mode!`);
+                // Server stays the same on tie-break entry, only alternates after 1st point
             }
 
             if (setWinner) {
-                updateMatchStatus(`PRO-SET WON by ${matchState['p' + setWinner + 'Name']} (${p1G}-${p2G})!`, 'match-end');
-                checkMatchEnd(); // The match is over since maxSets is 1
+                updateMatchStatus(`Set ${matchState.currentSetIndex + 1} WON by ${matchState['p' + setWinner + 'Name']} (${p1G}-${p2G})!`, 'set-end');
+                
+                if (matchState.matchFormat === 'best-of-3') {
+                     // Move to next set or end match
+                    if (matchState.currentSetIndex < config.maxSets - 1) {
+                         matchState.currentSetIndex++;
+                         matchState.sets.push({ p1: 0, p2: 0 });
+                         // Server remains the same at the start of a new set
+                    }
+                }
+                checkMatchEnd();
             }
         }
 
         function checkMatchEnd() {
-            // Pro-Set: The match is over when the only set is won.
-            const p1SetsWon = matchState.sets.filter(set => set.p1 > set.p2 && set.p1 >= PRO_SET_WIN_GAMES).length;
-            const p2SetsWon = matchState.sets.filter(set => set.p2 > set.p1 && set.p2 >= PRO_SET_WIN_GAMES).length;
+            const config = getMatchConfig(matchState.matchFormat);
+            const p1SetsWon = matchState.sets.filter(set => set.p1 > set.p2 && set.p1 >= config.winGames).length;
+            const p2SetsWon = matchState.sets.filter(set => set.p2 > set.p1 && set.p2 >= config.winGames).length;
+            
+            let winnerName = null;
+            if (matchState.matchFormat === 'pro-set' && (p1SetsWon === 1 || p2SetsWon === 1)) {
+                 winnerName = p1SetsWon === 1 ? matchState.p1Name : matchState.p2Name;
+            } else if (matchState.matchFormat === 'best-of-3' && (p1SetsWon === 2 || p2SetsWon === 2)) {
+                 winnerName = p1SetsWon === 2 ? matchState.p1Name : matchState.p2Name;
+            }
 
-            if (p1SetsWon === 1 || p2SetsWon === 1) {
-                matchState.matchStatus = (p1SetsWon === 1) ? `${matchState.p1Name} WINS THE PRO-SET!` : `${matchState.p2Name} WINS THE PRO-SET!`;
+            if (winnerName) {
+                matchState.matchStatus = `${winnerName} WINS THE MATCH!`;
                 updateMatchStatus(matchState.matchStatus, 'match-end');
                 disableButtons();
             } else {
@@ -489,13 +803,12 @@
         }
 
         window.recordPoint = function(winner) {
-            if (matchState.matchStatus.includes('WINS THE PRO-SET')) return;
-
-            matchState.history.push(JSON.parse(JSON.stringify(matchState)));
-            document.getElementById('btn-undo').disabled = false;
+            if (matchState.matchStatus.includes('WINS THE MATCH')) return;
 
             const pointType = document.getElementById('point-type').value;
             const rallyLength = Math.max(1, parseInt(document.getElementById('rally-length').value) || 1);
+            
+            const server = matchState.currentServer;
 
             let winnerName = matchState[`p${winner}Name`];
             let pointDescription;
@@ -510,7 +823,6 @@
                     matchState.p2Points++;
                 }
                 
-                // Check for game end in No-Ad scoring
                 if (matchState.p1Points === 4) {
                     handleGameWin(1);
                 } else if (matchState.p2Points === 4) {
@@ -522,63 +834,116 @@
             const logEntry = {
                 id: Date.now(),
                 winner: winner,
+                server: server, // Log who served this point
                 name: winnerName,
                 type: pointType,
                 rallyLength: rallyLength,
                 description: pointDescription
             };
             
-            displayLogEntry(logEntry);
+            const stateToSave = JSON.parse(JSON.stringify(matchState));
+            stateToSave.lastLogEntry = logEntry;
+            matchState.history.push(stateToSave);
+
+            displayLogEntry(logEntry, false); 
             render();
             saveMatchState();
         }
 
         window.undoLastPoint = function() {
-            if (matchState.history.length === 0) return;
+            if (matchState.history.length <= 1) { 
+                matchState.history = [];
+                resetMatchState(matchState.matchFormat); // Reset to the correct format state
+                updateMatchStatus('Match reset to start.');
+                document.getElementById('btn-undo').disabled = true;
+                saveMatchState();
+                return;
+            }
 
-            const previousState = matchState.history.pop();
+            matchState.history.pop(); 
+            const previousState = matchState.history[matchState.history.length - 1];
             
-            // Restore all critical state variables
+            // Restore all critical state variables from the previous state
             Object.keys(previousState).forEach(key => {
                 matchState[key] = previousState[key];
             });
 
-            // Update log display (remove the top item)
-            const logEl = document.getElementById('point-log');
-            if (logEl.firstChild && logEl.firstChild.tagName !== 'P') {
-                logEl.removeChild(logEl.firstChild);
-            }
-            if (logEl.children.length === 0) {
-                 logEl.innerHTML = '<p class="text-sm text-gray-500">No points recorded yet. Hit a point button to start logging!</p>';
-            }
-
+            // Rebuild the log display from the remaining history
+            document.getElementById('point-log').innerHTML = '';
+            matchState.history.forEach(state => {
+                 if (state.lastLogEntry) {
+                    displayLogEntry(state.lastLogEntry, true); 
+                }
+            });
             if (matchState.history.length === 0) {
-                document.getElementById('btn-undo').disabled = true;
+                 document.getElementById('point-log').innerHTML = '<p class="text-sm text-gray-500">No points recorded yet. Hit a point button to start logging!</p>';
+                 document.getElementById('btn-undo').disabled = true;
             }
 
-            checkMatchEnd(); // Re-evaluate match status
+            checkMatchEnd();
             updateMatchStatus('Last point undone.');
             render();
             saveMatchState();
+        }
+
+        function resetMatchState(format = 'pro-set') {
+            const config = getMatchConfig(format);
+            const initialSets = [{ p1: 0, p2: 0 }];
+            if (format === 'best-of-3') {
+                initialSets.push({ p1: 0, p2: 0 }, { p1: 0, p2: 0 });
+            }
+
+            matchState = {
+                p1Name: 'Player 1',
+                p2Name: 'Player 2',
+                sets: initialSets,
+                currentSetIndex: 0,
+                p1Points: 0,
+                p2Points: 0,
+                isTieBreak: false,
+                tieBreakScore: { p1: 0, p2: 0 },
+                matchStatus: 'Ongoing',
+                matchFormat: format,
+                currentServer: 1,
+                history: [],
+                matchId: (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) ? (currentUserId + '-' + Math.random().toString(36).substring(2, 9)) : 'local-match',
+                userId: (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) ? currentUserId : 'local-user-id'
+            };
+            document.getElementById('btn-undo').disabled = true;
         }
         
         // --- UI Rendering ---
 
         function render() {
+            const isProSet = matchState.matchFormat === 'pro-set';
+
+            // Update Headers and Columns based on format
+            document.getElementById('set2-header').style.display = isProSet ? 'none' : 'table-cell';
+            document.getElementById('set3-header').style.display = isProSet ? 'none' : 'table-cell';
+            
+            // Update Player Names
             document.getElementById('p1-name').textContent = matchState.p1Name;
             document.getElementById('p2-name').textContent = matchState.p2Name;
+            
+            // Set Scoreboard Visibility
+            const setElements = [
+                document.getElementById('p1-set2'), document.getElementById('p2-set2'),
+                document.getElementById('p1-set3'), document.getElementById('p2-set3')
+            ];
+            setElements.forEach(el => el.style.display = isProSet ? 'none' : 'table-cell');
 
-            // Only render the first set (Pro-Set)
+            // Update Set Scores
             document.getElementById('p1-set1').textContent = matchState.sets[0].p1;
             document.getElementById('p2-set1').textContent = matchState.sets[0].p2;
-            
-            // Set 2 & 3 are hidden by CSS, but ensure they don't break if logic accidentally tries to access them
-            if (document.getElementById('p1-set2')) document.getElementById('p1-set2').textContent = '-';
-            if (document.getElementById('p2-set2')) document.getElementById('p2-set2').textContent = '-';
-            if (document.getElementById('p1-set3')) document.getElementById('p1-set3').textContent = '-';
-            if (document.getElementById('p2-set3')) document.getElementById('p2-set3').textContent = '-';
 
+            if (!isProSet) {
+                document.getElementById('p1-set2').textContent = matchState.sets[1]?.p1 ?? '';
+                document.getElementById('p2-set2').textContent = matchState.sets[1]?.p2 ?? '';
+                document.getElementById('p1-set3').textContent = matchState.sets[2]?.p1 ?? '';
+                document.getElementById('p2-set3').textContent = matchState.sets[2]?.p2 ?? '';
+            }
 
+            // Update Current Game Score
             let p1CurrentPoints, p2CurrentPoints;
             if (matchState.isTieBreak) {
                 p1CurrentPoints = matchState.tieBreakScore.p1;
@@ -596,9 +961,13 @@
             p1GameEl.textContent = p1Text;
             p2GameEl.textContent = p2Text;
 
-            // Dynamic styling based on score state
-            p1GameEl.classList.remove('bg-yellow-50', 'text-yellow-700', 'bg-red-50', 'text-red-700', 'bg-green-50', 'text-green-700', 'bg-gray-200', 'text-gray-800');
-            p2GameEl.classList.remove('bg-yellow-50', 'text-yellow-700', 'bg-red-50', 'text-red-700', 'bg-green-50', 'text-green-700', 'bg-gray-200', 'text-gray-800');
+            // Update Server Icon
+            document.getElementById('p1-server-icon').style.display = matchState.currentServer === 1 && matchState.matchStatus === 'Ongoing' ? 'inline' : 'none';
+            document.getElementById('p2-server-icon').style.display = matchState.currentServer === 2 && matchState.matchStatus === 'Ongoing' ? 'inline' : 'none';
+
+            // Update Game Score Styling (simplified)
+            p1GameEl.className = 'px-3 py-4 whitespace-nowrap text-base font-bold text-center';
+            p2GameEl.className = 'px-3 py-4 whitespace-nowrap text-base font-bold text-center';
 
             if (p1Text === 'Deciding Point' || p2Text === 'Deciding Point') {
                 p1GameEl.classList.add('bg-gray-200', 'text-gray-800');
@@ -614,17 +983,22 @@
             document.getElementById('btn-p1').textContent = `Point for ${matchState.p1Name}`;
             document.getElementById('btn-p2').textContent = `Point for ${matchState.p2Name}`;
 
-            document.getElementById('btn-undo').disabled = matchState.history.length === 0 || matchState.matchStatus.includes('WINS THE PRO-SET');
+            document.getElementById('btn-undo').disabled = matchState.history.length === 0 || matchState.matchStatus.includes('WINS THE MATCH');
+            document.getElementById('btn-analytics').disabled = matchState.history.length === 0;
         }
 
-        function displayLogEntry(entry) {
+        function displayLogEntry(entry, silent = false) {
             const logEl = document.getElementById('point-log');
             if (logEl.firstChild && logEl.firstChild.tagName === 'P') {
                  logEl.innerHTML = '';
             }
 
             const logItem = document.createElement('div');
-            logItem.className = `p-2 rounded-lg text-sm transition-all duration-300 ${entry.winner === 1 ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'}`;
+            const isP1Winner = entry.winner === 1;
+            const winnerClass = isP1Winner ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500';
+            const serverIcon = entry.server === entry.winner ? '✔️' : '❌'; // Check if point was won on serve
+
+            logItem.className = `p-2 rounded-lg text-sm transition-all duration-300 ${winnerClass}`;
             
             const pointNameMap = { 
                 'W-G': 'Winner (Groundstroke)', 
@@ -638,53 +1012,44 @@
             logItem.innerHTML = `
                 <div class="flex justify-between font-semibold">
                     <span>${entry.name} Scores: ${entry.description}</span>
-                    <span class="text-xs font-normal text-gray-600">${new Date().toLocaleTimeString()}</span>
+                    <span class="text-xs font-normal text-gray-600">${new Date(entry.id).toLocaleTimeString()}</span>
                 </div>
                 <div class="text-xs mt-1">
                     Type: <span class="font-bold">${pointNameMap[entry.type]} (${entry.type})</span> | 
-                    Rally: <span class="font-bold">${entry.rallyLength} shots</span>
+                    Rally: <span class="font-bold">${entry.rallyLength} shots</span> |
+                    Serve: ${entry.server === entry.winner ? `<span class="text-green-600">Held (${serverIcon})</span>` : `<span class="text-red-600">Broken (${serverIcon})</span>`}
                 </div>
             `;
             
-            logEl.prepend(logItem);
+            if (!silent) {
+                 logEl.prepend(logItem);
+            } else {
+                 logEl.appendChild(logItem); 
+            }
         }
 
         function updateMatchStatus(message, type = 'normal') {
             const statusEl = document.getElementById('match-status');
             statusEl.textContent = message;
-            statusEl.classList.remove('text-green-600', 'text-red-600', 'text-indigo-600', 'text-2xl', 'font-extrabold');
+            statusEl.classList.remove('text-green-600', 'text-red-600', 'text-indigo-600', 'match-end-status', 'font-extrabold');
             if (type === 'match-end') {
-                statusEl.classList.add('text-indigo-600', 'text-2xl', 'font-extrabold');
+                statusEl.classList.add('text-indigo-600', 'match-end-status');
+            } else if (type === 'set-end') {
+                 statusEl.classList.add('text-indigo-600');
             } else {
                 statusEl.classList.add('text-green-600');
             }
         }
 
         window.resetMatch = function() {
-            matchState = {
-                p1Name: 'Player 1',
-                p2Name: 'Player 2',
-                sets: [
-                    { p1: 0, p2: 0 } // Reset to 1 set
-                ],
-                currentSetIndex: 0,
-                p1Points: 0,
-                p2Points: 0,
-                isTieBreak: false,
-                tieBreakScore: { p1: 0, p2: 0 },
-                matchStatus: 'Ongoing',
-                maxSets: 1, // Keep at 1
-                history: [],
-                matchId: (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) ? (currentUserId + '-' + Math.random().toString(36).substring(2, 9)) : 'local-match',
-                userId: (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) ? currentUserId : 'local-user-id'
-            };
+            resetMatchState(matchState.matchFormat);
             
             document.getElementById('point-log').innerHTML = '<p class="text-sm text-gray-500">No points recorded yet. Hit a point button to start logging!</p>';
-
             document.getElementById('match-id-display').textContent = matchState.matchId;
+            
             enableButtons();
             showModal();
-            updateMatchStatus('New Pro-Set Ready. Enter names.');
+            updateMatchStatus('Ready to start. Select names and format.');
             render();
         }
 
@@ -703,13 +1068,23 @@
             try {
                 const p1Input = document.getElementById('p1-input').value.trim() || 'Player 1';
                 const p2Input = document.getElementById('p2-input').value.trim() || 'Player 2';
+                const format = document.querySelector('input[name="match-format"]:checked').value;
+
+                // If format changed, reset state to match new format rules
+                if (format !== matchState.matchFormat || matchState.p1Name === 'Player 1') {
+                    resetMatchState(format);
+                }
 
                 matchState.p1Name = p1Input;
                 matchState.p2Name = p2Input;
+                matchState.matchFormat = format; // Set format on start
 
                 document.getElementById('modal').style.display = 'none';
 
-                updateMatchStatus('Pro-Set is Active');
+                // Save the initial state to history for undo
+                matchState.history.push(JSON.parse(JSON.stringify(matchState))); 
+
+                updateMatchStatus('Match is Active');
                 render();
                 saveMatchState();
 
@@ -738,6 +1113,12 @@
         window.onload = function() {
             disableButtons();
             initFirebase();
+            
+            // If the URL has a matchId, skip the modal and try to load the data first
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.get('matchId')) {
+                 showModal();
+            }
         };
 
     </script>
