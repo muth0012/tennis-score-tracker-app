@@ -141,6 +141,12 @@
                 class="px-8 py-3 bg-teal-500 text-white font-medium rounded-lg shadow-sm hover:bg-teal-600 transition duration-200 focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:bg-gray-400">
                 View Match Analytics
             </button>
+            
+            <button onclick="exportMatchData()" id="btn-export" disabled
+                class="px-8 py-3 bg-fuchsia-500 text-white font-medium rounded-lg shadow-sm hover:bg-fuchsia-600 transition duration-200 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 disabled:bg-gray-400">
+                Export Match Data (CSV)
+            </button>
+
             <button onclick="showMatchHistoryModal()" id="btn-history" disabled
                 class="px-8 py-3 bg-indigo-500 text-white font-medium rounded-lg shadow-sm hover:bg-indigo-600 transition duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-400">
                 View Match History
@@ -329,6 +335,7 @@
                 enableButtons();
                 document.getElementById('btn-history').disabled = true;
                 document.getElementById('btn-analytics').disabled = true;
+                document.getElementById('btn-export').disabled = true; // Disable export in this mode too
                 return;
             }
 
@@ -360,6 +367,7 @@
                         enableButtons();
                         document.getElementById('btn-history').disabled = false;
                         document.getElementById('btn-analytics').disabled = false;
+                        document.getElementById('btn-export').disabled = false; // Enable export when signed in
 
                     } else {
                         console.error("Authentication failed: User is null after sign-in.");
@@ -685,6 +693,70 @@
             `;
         }
 
+        // --- Data Export Functions ---
+
+        function convertToCSV(history) {
+            if (history.length === 0) return '';
+
+            const header = [
+                "Timestamp", "Winner", "Loser", "SetScore_P1", "SetScore_P2", "GameScore_P1", 
+                "GameScore_P2", "IsTieBreak", "Server", "PointType", "RallyLength"
+            ];
+            
+            const rows = [];
+            history.forEach(state => {
+                const log = state.lastLogEntry;
+                if (!log) return;
+                
+                const currentSet = state.sets[state.currentSetIndex];
+                const p1Score = POINT_MAP[state.p1Points] || (state.isTieBreak ? state.tieBreakScore.p1 : 'Game End');
+                const p2Score = POINT_MAP[state.p2Points] || (state.isTieBreak ? state.tieBreakScore.p2 : 'Game End');
+                
+                const winnerName = state[`p${log.winner}Name`];
+                const loserName = state[`p${log.winner === 1 ? 2 : 1}Name`];
+                
+                rows.push([
+                    new Date(log.id).toISOString(),
+                    winnerName,
+                    loserName,
+                    currentSet.p1,
+                    currentSet.p2,
+                    state.isTieBreak ? state.tieBreakScore.p1 : p1Score,
+                    state.isTieBreak ? state.tieBreakScore.p2 : p2Score,
+                    state.isTieBreak ? 'Yes' : 'No',
+                    state[`p${log.server}Name`],
+                    log.type,
+                    log.rallyLength
+                ].map(item => `"${item}"`).join(','));
+            });
+
+            return [header.join(','), ...rows].join('\n');
+        }
+
+        window.exportMatchData = function() {
+            if (matchState.history.length === 0) {
+                alert('No points recorded to export!'); // Using alert for critical user feedback on export failure
+                return;
+            }
+
+            const csvContent = convertToCSV(matchState.history);
+            const filename = `${matchState.p1Name.replace(/\s/g, '')}-vs-${matchState.p2Name.replace(/\s/g, '')}-${matchState.matchFormat}-Export.csv`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            // Create a temporary link element to trigger the download
+            const link = document.createElement("a");
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
 
         // --- Core Scoring Logic ---
 
@@ -1005,9 +1077,17 @@
             document.getElementById('btn-p1').textContent = `Point for ${matchState.p1Name}`;
             document.getElementById('btn-p2').textContent = `Point for ${matchState.p2Name}`;
 
-            document.getElementById('btn-undo').disabled = matchState.history.length === 0 || matchState.matchStatus.includes('WINS THE MATCH') || matchState.matchStatus.includes('Ended Manually');
-            document.getElementById('btn-analytics').disabled = matchState.history.length === 0 && !matchState.matchStatus.includes('WINS THE MATCH') && !matchState.matchStatus.includes('Ended Manually');
-            document.getElementById('btn-end-match').disabled = matchState.matchStatus.includes('WINS THE MATCH') || matchState.matchStatus.includes('Ended Manually');
+            const isMatchOver = matchState.matchStatus.includes('WINS THE MATCH') || matchState.matchStatus.includes('Ended Manually');
+
+            document.getElementById('btn-undo').disabled = matchState.history.length === 0 || isMatchOver;
+            document.getElementById('btn-analytics').disabled = matchState.history.length === 0 && !isMatchOver;
+            document.getElementById('btn-export').disabled = matchState.history.length === 0 && !isMatchOver;
+            document.getElementById('btn-end-match').disabled = isMatchOver;
+            
+            // Analytics/Export will only activate if history is > 0 OR the match has ended (to view final stats)
+            const analyticsExportReady = matchState.history.length > 0 || isMatchOver;
+            document.getElementById('btn-analytics').disabled = !analyticsExportReady;
+            document.getElementById('btn-export').disabled = !analyticsExportReady;
         }
 
         function displayLogEntry(entry, silent = false) {
@@ -1121,8 +1201,9 @@
             document.getElementById('btn-p1').disabled = true;
             document.getElementById('btn-p2').disabled = true;
             document.getElementById('btn-undo').disabled = true;
-            document.getElementById('btn-analytics').disabled = true; // Disabled initially
-            document.getElementById('btn-end-match').disabled = true; // Added
+            document.getElementById('btn-analytics').disabled = true; 
+            document.getElementById('btn-export').disabled = true; // Added
+            document.getElementById('btn-end-match').disabled = true; 
             document.getElementById('btn-p1').classList.add('opacity-50', 'cursor-not-allowed');
             document.getElementById('btn-p2').classList.add('opacity-50', 'cursor-not-allowed');
         }
@@ -1132,7 +1213,12 @@
             document.getElementById('btn-p2').disabled = false;
             document.getElementById('btn-p1').classList.remove('opacity-50', 'cursor-not-allowed');
             document.getElementById('btn-p2').classList.remove('opacity-50', 'cursor-not-allowed');
-            document.getElementById('btn-end-match').disabled = false; // Added
+            document.getElementById('btn-end-match').disabled = false;
+            
+            // Analytics/Export enable based on scoring activity
+            const analyticsExportReady = matchState.history.length > 0 || matchState.matchStatus.includes('WINS THE MATCH') || matchState.matchStatus.includes('Ended Manually');
+            document.getElementById('btn-analytics').disabled = !analyticsExportReady;
+            document.getElementById('btn-export').disabled = !analyticsExportReady; 
         }
 
         // Initialize the app: start firebase connection
@@ -1152,11 +1238,12 @@
         window.closeMatchHistoryModal = closeMatchHistoryModal;
         window.showMatchAnalyticsModal = showMatchAnalyticsModal;
         window.closeMatchAnalyticsModal = closeMatchAnalyticsModal;
+        window.exportMatchData = exportMatchData; // Exported new function
         window.saveNames = saveNames;
         window.recordPoint = recordPoint;
         window.undoLastPoint = undoLastPoint;
         window.resetMatch = resetMatch;
-        window.endMatch = endMatch; // Exposed new function
+        window.endMatch = endMatch; 
 
     </script>
 </body>
