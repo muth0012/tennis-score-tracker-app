@@ -30,6 +30,10 @@
             font-weight: 800;
         }
     </style>
+    <!-- CRITICAL FIX: Load Firebase modules via traditional script tags to avoid import issues on GitHub Pages -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js" crossorigin="anonymous"></script>
 </head>
 <body class="p-4">
 
@@ -229,10 +233,9 @@
 
     </div>
 
-    <script type="module">
+    <script>
         // --- START OF CONFIGURATION ---
         // 1. Manually set your Firebase Config here for external hosting (GitHub Pages).
-        //    This uses the configuration provided by the user.
         const MANUAL_FIREBASE_CONFIG = {
              apiKey: "AIzaSyBOdTC5Q8MmbDhlNGlpm-EFQgJFZebIUZI",
              authDomain: "tennis-score-tracker-bd317.firebaseapp.com",
@@ -243,36 +246,10 @@
              measurementId: "G-5XY6ES44VR"
         };
 
-        // 2. Check if the environment variables are available (for running in the Canvas environment).
-        const IS_ENV_CONFIG_AVAILABLE = typeof __firebase_config !== 'undefined' && JSON.parse(__firebase_config).projectId;
-        const IS_MANUAL_CONFIG_AVAILABLE = MANUAL_FIREBASE_CONFIG.projectId && MANUAL_FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY_HERE";
-
-
-        let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, setLogLevel, collection, query, where, getDocs;
-
-        if (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) {
-            // Dynamically import Firebase only if we have the configuration
-            const firebaseModules = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-            const authModules = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-            const firestoreModules = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-            
-            initializeApp = firebaseModules.initializeApp;
-            getAuth = authModules.getAuth;
-            signInAnonymously = authModules.signInAnonymously;
-            signInWithCustomToken = authModules.signInWithCustomToken;
-            onAuthStateChanged = authModules.onAuthStateChanged;
-            getFirestore = firestoreModules.getFirestore;
-            doc = firestoreModules.doc;
-            setDoc = firestoreModules.setDoc;
-            onSnapshot = firestoreModules.onSnapshot;
-            setLogLevel = firestoreModules.setLogLevel;
-            collection = firestoreModules.collection;
-            query = firestoreModules.query;
-            where = firestoreModules.where;
-            getDocs = firestoreModules.getDocs;
-
-            setLogLevel('Debug');
-        }
+        // Check if the environment variables are available (for running in the Canvas environment).
+        // Since we are using global scripts, we check if the functions are available instead of imports.
+        const IS_ENV_CONFIG_AVAILABLE = typeof firebase !== 'undefined' && typeof __firebase_config !== 'undefined' && JSON.parse(__firebase_config).projectId;
+        const IS_MANUAL_CONFIG_AVAILABLE = typeof firebase !== 'undefined' && MANUAL_FIREBASE_CONFIG.projectId && MANUAL_FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY_HERE";
 
         // Global variables determined by environment vs. manual config
         const appId = IS_ENV_CONFIG_AVAILABLE ? (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id') : MANUAL_FIREBASE_CONFIG.projectId;
@@ -325,53 +302,76 @@
         // --- Firebase Initialization and Authentication ---
 
         async function initFirebase() {
-            if (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE) {
-                console.warn("Running in Local Mode: Firebase config not found. Data will not persist across sessions/devices.");
+            // Check if Firebase is globally available and if we have configuration data
+            if (typeof firebase === 'undefined' || (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE)) {
+                console.warn("Running in Local Mode: Firebase config not found or Firebase libraries failed to load.");
                 document.getElementById('match-status').textContent = 'Local Mode: Data not saved.';
-                document.getElementById('save-status').textContent = 'Persistence Disabled (No Firebase Config)';
+                document.getElementById('save-status').textContent = 'Persistence Disabled (No Firebase Connection)';
                 document.getElementById('match-id-display').textContent = 'N/A (Local)';
                 document.getElementById('user-id-display').textContent = 'Local User';
                 showModal();
                 enableButtons();
                 document.getElementById('btn-history').disabled = true;
                 document.getElementById('btn-analytics').disabled = true;
-                document.getElementById('btn-export').disabled = true; // Disable export in this mode too
+                document.getElementById('btn-export').disabled = true;
                 return;
             }
 
+            // Using global firebase variables due to script imports
+            const { initializeApp } = firebase.app;
+            const { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = firebase.auth;
+            const { getFirestore, doc, setDoc, onSnapshot, collection, query, where, getDocs, setLogLevel } = firebase.firestore;
+
+
             try {
+                // Initialize Firebase App
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
+                // Set Firestore log level (helpful for debugging)
+                setLogLevel('Debug');
+                
                 const urlParams = new URLSearchParams(window.location.search);
                 const urlMatchId = urlParams.get('matchId');
-                
+
+                // --- AUTHENTICATION LOGIC ---
+                // If running in Canvas with token, use token. Otherwise, use Anonymous Sign-in.
                 if (initialAuthToken && IS_ENV_CONFIG_AVAILABLE) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
                     await signInAnonymously(auth);
                 }
 
+                // Listen for Auth State Changes
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         currentUserId = user.uid;
                         document.getElementById('user-id-display').textContent = currentUserId;
                         matchState.userId = currentUserId;
                         
+                        // Set match ID: URL parameter or default to the current user's ID
                         matchState.matchId = urlMatchId || currentUserId;
                         document.getElementById('match-id-display').textContent = matchState.matchId;
 
                         setupRealtimeListener();
 
                         enableButtons();
+                        // Enable persistence-dependent buttons now that we are authenticated
                         document.getElementById('btn-history').disabled = false;
                         document.getElementById('btn-analytics').disabled = false;
-                        document.getElementById('btn-export').disabled = false; // Enable export when signed in
+                        document.getElementById('btn-export').disabled = false;
+
+                        // If no match ID in URL, prompt user to start
+                         if (!urlMatchId) {
+                            showModal();
+                        }
 
                     } else {
                         console.error("Authentication failed: User is null after sign-in.");
-                        document.getElementById('match-status').textContent = 'Error: Authentication failed.';
+                        document.getElementById('match-status').textContent = 'Error: Authentication failed. Check Auth Logs.';
+                        // Fallback to local user ID if auth fails
+                        matchState.userId = 'local-user-auth-failed';
                     }
                 });
 
@@ -385,6 +385,9 @@
 
         function setupRealtimeListener() {
             if (!db || !matchState.matchId) return;
+
+            // Using global firebase.firestore functions
+            const { doc, onSnapshot } = firebase.firestore;
 
             if (unsubscribeMatchListener) {
                 unsubscribeMatchListener();
@@ -410,13 +413,15 @@
         }
 
         async function saveMatchState() {
-            if (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE) {
+            if (typeof firebase === 'undefined' || (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE)) {
                 document.getElementById('save-status').textContent = 'Local Mode: Not saving to cloud.';
                 return;
             }
 
             if (!db || !matchState.matchId) return; 
 
+            // Using global firebase.firestore functions
+            const { doc, setDoc } = firebase.firestore;
             const docRef = doc(db, MATCH_COLLECTION, matchState.matchId);
             
             // Prepare sets for saving (only up to current set)
@@ -518,6 +523,9 @@
                  document.getElementById('match-list').innerHTML = '<p class="text-center text-red-500">Authentication required to view history.</p>';
                  return;
              }
+             
+             // Using global firebase.firestore functions
+             const { collection, query, where, getDocs } = firebase.firestore;
 
              const matchRef = collection(db, MATCH_COLLECTION);
              const q = query(matchRef, where("userId", "==", currentUserId));
@@ -597,7 +605,7 @@
             const p2Stats = calculatePlayerStats(history, 2, p2Name);
 
             const totalRallies = history.length;
-            const totalRallyLength = history.reduce((sum, entry) => sum + entry.rallyLength, 0);
+            const totalRallyLength = history.reduce((sum, entry => sum + entry.rallyLength), 0);
             const avgRallyLength = (totalRallyLength / totalRallies).toFixed(2);
             
             let html = `
@@ -1087,7 +1095,7 @@
             // Analytics/Export will only activate if history is > 0 OR the match has ended (to view final stats)
             const analyticsExportReady = matchState.history.length > 0 || isMatchOver;
             document.getElementById('btn-analytics').disabled = !analyticsExportReady;
-            document.getElementById('btn-export').disabled = !analyticsExportReady;
+            document.getElementById('btn-export').disabled = !analyticsExportReady; 
         }
 
         function displayLogEntry(entry, silent = false) {
@@ -1120,7 +1128,7 @@
                 <div class="text-xs mt-1">
                     Type: <span class="font-bold">${pointNameMap[entry.type]} (${entry.type})</span> | 
                     Rally: <span class="font-bold">${entry.rallyLength} shots</span> |
-                    Serve: ${entry.server === entry.winner ? `<span class="text-green-600">Held (${serverIcon})</span>` : `<span class="text-red-600">Broken (${serverIcon})</span>`}
+                    Serve: ${entry.server === entry.winner ? `<span class="text-green-600">Held (Served ${entry.server})</span>` : `<span class="text-red-600">Broken (Served ${entry.server === 1 ? 2 : 1})</span>`}
                 </div>
             `;
             
@@ -1202,7 +1210,7 @@
             document.getElementById('btn-p2').disabled = true;
             document.getElementById('btn-undo').disabled = true;
             document.getElementById('btn-analytics').disabled = true; 
-            document.getElementById('btn-export').disabled = true; // Added
+            document.getElementById('btn-export').disabled = true;
             document.getElementById('btn-end-match').disabled = true; 
             document.getElementById('btn-p1').classList.add('opacity-50', 'cursor-not-allowed');
             document.getElementById('btn-p2').classList.add('opacity-50', 'cursor-not-allowed');
@@ -1238,7 +1246,7 @@
         window.closeMatchHistoryModal = closeMatchHistoryModal;
         window.showMatchAnalyticsModal = showMatchAnalyticsModal;
         window.closeMatchAnalyticsModal = closeMatchAnalyticsModal;
-        window.exportMatchData = exportMatchData; // Exported new function
+        window.exportMatchData = exportMatchData;
         window.saveNames = saveNames;
         window.recordPoint = recordPoint;
         window.undoLastPoint = undoLastPoint;
