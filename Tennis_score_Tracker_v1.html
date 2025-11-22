@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tennis Match Tracker (Advanced No-Ad)</title>
+    <title>Tennis Pro-Set Tracker (No-Ad, Up to 8 Games)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter Font -->
@@ -22,15 +22,29 @@
             overflow-y: auto;
             scrollbar-width: thin;
         }
+        /* Custom styles to hide unused set columns */
+        .set-column {
+            display: none !important; 
+        }
+        .pro-set-column {
+            width: 20%; 
+            display: table-cell !important;
+        }
+        /* Ensure table adapts well on small screens */
+        @media (min-width: 640px) {
+            .pro-set-column {
+                width: 15%; 
+            }
+        }
     </style>
 </head>
 <body class="p-4">
 
-    <div id="app" class="w-full max-w-5xl bg-white shadow-2xl rounded-xl p-6 md:p-10 border border-gray-100">
+    <div id="app" class="w-full max-w-3xl bg-white shadow-2xl rounded-xl p-6 md:p-10 border border-gray-100">
 
         <!-- Header and Status -->
         <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 text-center mb-2 tracking-tight">
-            Tennis Scoreboard (No-Ad)
+            Single Pro-Set Scoreboard (No-Ad)
         </h1>
         <p id="match-status" class="text-center text-lg mb-4 font-semibold text-green-600 transition duration-300">
             Initializing...
@@ -39,10 +53,10 @@
         <!-- Match ID and Persistence Status -->
         <div class="mb-6 text-center text-sm text-gray-500 space-y-2">
             <p>
-                <span class="font-bold">Match ID:</span> <span id="match-id-display">Loading...</span>
+                <span class="font-bold">Match ID:</span> <span id="match-id-display">N/A (Local Mode)</span>
             </p>
             <p>
-                <span class="font-bold">User ID:</span> <span id="user-id-display">Loading...</span>
+                <span class="font-bold">User ID:</span> <span id="user-id-display">Local User</span>
             </p>
             <p id="save-status" class="font-medium text-gray-600">Awaiting user action...</p>
         </div>
@@ -52,10 +66,11 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:w-1/5">Player</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Set 1</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Set 2</th>
-                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Set 3</th>
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:w-2/5">Player</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider pro-set-column">Games</th>
+                        <!-- Set 2 & 3 columns are now hidden for Pro-Set -->
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider set-column">Set 2</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider set-column">Set 3</th>
                         <th class="px-3 py-3 text-center text-sm font-bold text-gray-700 uppercase tracking-wider w-1/4 bg-gray-200">Game Score</th>
                     </tr>
                 </thead>
@@ -63,17 +78,17 @@
                     <!-- Player 1 Row -->
                     <tr>
                         <td id="p1-name" class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Player 1</td>
-                        <td id="p1-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700">0</td>
-                        <td id="p1-set2" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 hidden sm:table-cell">0</td>
-                        <td id="p1-set3" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 hidden sm:table-cell">0</td>
+                        <td id="p1-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 pro-set-column">0</td>
+                        <td id="p1-set2" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
+                        <td id="p1-set3" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p1-game-score" class="px-3 py-4 whitespace-nowrap text-base font-bold text-center bg-green-50 text-green-700">Love</td>
                     </tr>
                     <!-- Player 2 Row -->
                     <tr>
                         <td id="p2-name" class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Player 2</td>
-                        <td id="p2-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700">0</td>
-                        <td id="p2-set2" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 hidden sm:table-cell">0</td>
-                        <td id="p2-set3" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 hidden sm:table-cell">0</td>
+                        <td id="p2-set1" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 pro-set-column">0</td>
+                        <td id="p2-set2" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
+                        <td id="p2-set3" class="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-700 set-column">0</td>
                         <td id="p2-game-score" class="px-3 py-4 whitespace-nowrap text-base font-bold text-center bg-red-50 text-red-700">Love</td>
                     </tr>
                 </tbody>
@@ -161,17 +176,51 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- START OF CONFIGURATION ---
+        // 1. Manually set your Firebase Config here for external hosting (GitHub Pages).
+        //    This uses the configuration provided by the user.
+        const MANUAL_FIREBASE_CONFIG = {
+             apiKey: "AIzaSyBOdTC5Q8MmbDhlNGlpm-EFQgJFZebIUZI",
+             authDomain: "tennis-score-tracker-bd317.firebaseapp.com",
+             projectId: "tennis-score-tracker-bd317",
+             storageBucket: "tennis-score-tracker-bd317.firebasestorage.app",
+             messagingSenderId: "301275539476",
+             appId: "1:301275539476:web:6ae1032d7d23f7c699df01",
+             measurementId: "G-5XY6ES44VR"
+        };
 
-        setLogLevel('Debug');
+        // 2. Check if the environment variables are available (for running in the Canvas environment).
+        //    If not, we default to the manual configuration.
+        const IS_ENV_CONFIG_AVAILABLE = typeof __firebase_config !== 'undefined' && JSON.parse(__firebase_config).projectId;
+        const IS_MANUAL_CONFIG_AVAILABLE = MANUAL_FIREBASE_CONFIG.projectId && MANUAL_FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY_HERE";
 
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, setLogLevel;
+
+        if (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) {
+            // Dynamically import Firebase only if we have the configuration
+            const firebaseModules = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+            const authModules = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+            const firestoreModules = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            
+            initializeApp = firebaseModules.initializeApp;
+            getAuth = authModules.getAuth;
+            signInAnonymously = authModules.signInAnonymously;
+            signInWithCustomToken = authModules.signInWithCustomToken;
+            onAuthStateChanged = authModules.onAuthStateChanged;
+            getFirestore = firestoreModules.getFirestore;
+            doc = firestoreModules.doc;
+            setDoc = firestoreModules.setDoc;
+            onSnapshot = firestoreModules.onSnapshot;
+            setLogLevel = firestoreModules.setLogLevel;
+
+            setLogLevel('Debug');
+        }
+
+        // Global variables determined by environment vs. manual config
+        const appId = IS_ENV_CONFIG_AVAILABLE ? (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id') : MANUAL_FIREBASE_CONFIG.projectId;
+        const firebaseConfig = IS_ENV_CONFIG_AVAILABLE ? JSON.parse(__firebase_config) : MANUAL_FIREBASE_CONFIG;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; // Only used in Canvas
 
         let db, auth, currentUserId;
         let unsubscribeMatchListener = null;
@@ -180,9 +229,8 @@
         let matchState = {
             p1Name: 'Player 1',
             p2Name: 'Player 2',
+            // Only one set for Pro-Set
             sets: [
-                { p1: 0, p2: 0 },
-                { p1: 0, p2: 0 },
                 { p1: 0, p2: 0 }
             ],
             currentSetIndex: 0,
@@ -191,28 +239,40 @@
             isTieBreak: false,
             tieBreakScore: { p1: 0, p2: 0 },
             matchStatus: 'Ongoing',
-            maxSets: 3,
+            maxSets: 1, // Changed from 3 to 1
             history: [], // Stores previous full matchState objects for undo
             matchId: 'new-match', // Default ID, will be replaced by user ID or query param
-            userId: null
+            userId: 'local-user-id'
         };
 
         const POINT_MAP = ['Love', '15', '30', '40'];
         const MATCH_COLLECTION = `artifacts/${appId}/public/data/tennis_matches`;
+        const PRO_SET_WIN_GAMES = 8; // Define Pro-Set win condition (8 games)
 
         // --- Firebase Initialization and Authentication ---
 
         async function initFirebase() {
+            if (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE) {
+                console.warn("Running in Local Mode: Firebase config not found. Data will not persist across sessions/devices.");
+                document.getElementById('match-status').textContent = 'Local Mode: Data not saved.';
+                document.getElementById('save-status').textContent = 'Persistence Disabled (No Firebase Config)';
+                document.getElementById('match-id-display').textContent = 'N/A (Local)';
+                document.getElementById('user-id-display').textContent = 'Local User';
+                showModal();
+                enableButtons();
+                return;
+            }
+
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // Check for existing matchId in URL (optional feature for loading shared match)
                 const urlParams = new URLSearchParams(window.location.search);
                 const urlMatchId = urlParams.get('matchId');
                 
-                if (initialAuthToken) {
+                // AUTHENTICATION LOGIC: Use Canvas token if available, otherwise sign in anonymously
+                if (initialAuthToken && IS_ENV_CONFIG_AVAILABLE) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
                     await signInAnonymously(auth);
@@ -224,12 +284,12 @@
                         document.getElementById('user-id-display').textContent = currentUserId;
                         matchState.userId = currentUserId;
                         
-                        // Decide on matchId: Use URL, or default to user's new match ID
+                        // Use URL match ID if present, otherwise default to the user's ID
                         matchState.matchId = urlMatchId || currentUserId;
                         document.getElementById('match-id-display').textContent = matchState.matchId;
 
                         setupRealtimeListener();
-                        // Only show modal if match state is still default
+                        // Only show modal if P1 name is default AND we are not loading a shared match
                         if (matchState.p1Name === 'Player 1' && !urlMatchId) {
                             showModal();
                         }
@@ -249,8 +309,10 @@
         // --- Data Persistence (Firestore) ---
 
         function setupRealtimeListener() {
+            if (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE) return; // Skip if in local mode
+
             if (unsubscribeMatchListener) {
-                unsubscribeMatchListener(); // Clean up previous listener
+                unsubscribeMatchListener();
             }
 
             const docRef = doc(db, MATCH_COLLECTION, matchState.matchId);
@@ -258,13 +320,12 @@
             unsubscribeMatchListener = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists() && docSnap.id === matchState.matchId) {
                     const data = docSnap.data();
-                    // Load data only if it was saved by a different user OR if it's the first load
-                    if (data.userId !== matchState.userId || matchState.p1Name === 'Player 1') {
+                    // Load data if it's from another user, or if current user hasn't set names yet
+                    if (data.userId !== matchState.userId || matchState.p1Name === 'Player 1') { 
                         loadMatchState(data);
                         updateMatchStatus(`Match loaded from database! ID: ${matchState.matchId}`);
                     }
                 } else {
-                    // Document doesn't exist, save the current default state to create it
                     saveMatchState();
                     updateMatchStatus('New match document created.');
                 }
@@ -275,23 +336,43 @@
         }
 
         async function saveMatchState() {
+            if (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE) {
+                document.getElementById('save-status').textContent = 'Local Mode: Not saving to cloud.';
+                return;
+            }
+
             if (!db || !matchState.matchId) return;
 
             const docRef = doc(db, MATCH_COLLECTION, matchState.matchId);
             const stateToSave = {
                 ...matchState,
-                // Simplify history for saving (only keep last 100 entries to prevent document size issues)
                 history: matchState.history.slice(-100), 
                 lastUpdated: Date.now(),
-                userId: currentUserId // Record who last updated it
+                userId: currentUserId
             };
 
             try {
                 document.getElementById('save-status').textContent = 'Saving...';
-                await setDoc(docRef, stateToSave);
-                document.getElementById('save-status').textContent = 'Saved!';
+                // Implement exponential backoff for the API call
+                const maxRetries = 5;
+                let delay = 1000;
+
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        await setDoc(docRef, stateToSave);
+                        document.getElementById('save-status').textContent = 'Saved!';
+                        return; // Success, exit function
+                    } catch (error) {
+                        if (i < maxRetries - 1) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2; // Exponential backoff
+                        } else {
+                            throw error; // Re-throw the error after max retries
+                        }
+                    }
+                }
             } catch (e) {
-                console.error("Error saving document: ", e);
+                console.error("Error saving document after retries: ", e);
                 document.getElementById('save-status').textContent = `Save Error: ${e.message}`;
             }
         }
@@ -303,43 +384,32 @@
                     matchState[key] = data[key];
                 }
             });
-            // Ensure necessary fields are initialized if missing from old saved data
-            matchState.sets = matchState.sets || [{ p1: 0, p2: 0 }, { p1: 0, p2: 0 }, { p1: 0, p2: 0 }];
+            // Ensure sets array matches the maxSets length (1 for Pro-Set)
+            matchState.sets = matchState.sets.slice(0, matchState.maxSets) || [{ p1: 0, p2: 0 }];
             matchState.history = matchState.history || [];
             matchState.isTieBreak = matchState.isTieBreak || false;
             matchState.tieBreakScore = matchState.tieBreakScore || { p1: 0, p2: 0 };
             
-            checkMatchEnd(); // Re-check if match is over
+            checkMatchEnd();
             render();
         }
 
         // --- Core Scoring Logic ---
 
-        /**
-         * Converts numerical point score to tennis text score using NO-AD rules, supporting Tie-Break.
-         */
         function getGameScoreText(p1, p2) {
             if (matchState.isTieBreak) {
-                // Tie-break scores are numerical
                 return [p1.toString(), p2.toString()];
             }
-
-            // Game End (No-Ad)
+            // No-Ad Scoring
             if (p1 === 4) return ['WINS', ''];
             if (p2 === 4) return ['', 'WINS'];
-
-            // Deciding Point (Deuce in No-Ad)
             if (p1 === 3 && p2 === 3) return ['Deciding Point', 'Deciding Point'];
 
-            // Normal score
             const p1Text = POINT_MAP[p1];
             const p2Text = POINT_MAP[p2];
             return [p1Text, p2Text];
         }
 
-        /**
-         * Handles a game win, resets points, and checks for set win.
-         */
         function handleGameWin(winner) {
             const currentSet = matchState.sets[matchState.currentSetIndex];
 
@@ -349,15 +419,11 @@
                 currentSet.p2++;
             }
 
-            // Reset game points
             matchState.p1Points = 0;
             matchState.p2Points = 0;
-
-            // Exit tie-break mode if we were in one
             matchState.isTieBreak = false;
             matchState.tieBreakScore = { p1: 0, p2: 0 };
 
-            // Check for set win and match win
             checkSetWin();
 
             if (matchState.matchStatus === 'Ongoing') {
@@ -365,10 +431,6 @@
             }
         }
         
-        /**
-         * Handles a tie-break point win and checks for tie-break set win.
-         * @param {number} winner - 1 or 2
-         */
         function handleTieBreakPoint(winner) {
             const tb = matchState.tieBreakScore;
 
@@ -378,16 +440,13 @@
                 tb.p2++;
             }
 
-            // Tie-break win rules: First to 7, must win by 2
+            // Tie-break win: 7 points, win by 2
             if ((tb.p1 >= 7 && tb.p1 >= tb.p2 + 2) || (tb.p2 >= 7 && tb.p2 >= tb.p1 + 2)) {
-                handleGameWin(winner); // This implicitly handles the set win and advances to next set
+                handleGameWin(winner);
                 updateMatchStatus(`Tie-break won by ${matchState['p' + winner + 'Name']}!`);
             }
         }
 
-        /**
-         * Checks if the current set is won or if a tie-break is needed.
-         */
         function checkSetWin() {
             const currentSet = matchState.sets[matchState.currentSetIndex];
             const p1G = currentSet.p1;
@@ -395,40 +454,32 @@
 
             let setWinner = null;
 
-            // Set win rules: Win by 2 games.
-            if (p1G >= 6 && p1G >= p2G + 2) {
+            // Pro-Set Win Condition: 8 games, win by 2
+            if (p1G >= PRO_SET_WIN_GAMES && p1G >= p2G + 2) {
                 setWinner = 1;
-            } else if (p2G >= 6 && p2G >= p1G + 2) {
+            } else if (p2G >= PRO_SET_WIN_GAMES && p2G >= p1G + 2) {
                 setWinner = 2;
             }
 
-            // Tie-break rule: If 6-6, start tie-break game
-            if (!setWinner && p1G === 6 && p2G === 6) {
+            // Tie-break Trigger: at 8-8
+            if (!setWinner && p1G === PRO_SET_WIN_GAMES && p2G === PRO_SET_WIN_GAMES) {
                 matchState.isTieBreak = true;
-                updateMatchStatus('The set is tied at 6-6. Entering Tie-Break Mode!');
+                updateMatchStatus('The Pro-Set is tied at 8-8. Entering Tie-Break Mode!');
             }
 
             if (setWinner) {
-                // Set is won.
-                updateMatchStatus(`Set ${matchState.currentSetIndex + 1} won by ${matchState['p' + setWinner + 'Name']} (${p1G}-${p2G})!`);
-                checkMatchEnd();
-
-                // Advance to the next set if available and match is not over
-                if (matchState.matchStatus === 'Ongoing' && matchState.currentSetIndex < matchState.maxSets - 1) {
-                    matchState.currentSetIndex++;
-                }
+                updateMatchStatus(`PRO-SET WON by ${matchState['p' + setWinner + 'Name']} (${p1G}-${p2G})!`, 'match-end');
+                checkMatchEnd(); // The match is over since maxSets is 1
             }
         }
 
-        /**
-         * Checks if the match has been won.
-         */
         function checkMatchEnd() {
-            const p1SetsWon = matchState.sets.filter(set => set.p1 > set.p2 && set.p1 >= 6).length;
-            const p2SetsWon = matchState.sets.filter(set => set.p2 > set.p1 && set.p2 >= 6).length;
+            // Pro-Set: The match is over when the only set is won.
+            const p1SetsWon = matchState.sets.filter(set => set.p1 > set.p2 && set.p1 >= PRO_SET_WIN_GAMES).length;
+            const p2SetsWon = matchState.sets.filter(set => set.p2 > set.p1 && set.p2 >= PRO_SET_WIN_GAMES).length;
 
-            if (p1SetsWon === 2 || p2SetsWon === 2) {
-                matchState.matchStatus = (p1SetsWon === 2) ? `${matchState.p1Name} WINS THE MATCH!` : `${matchState.p2Name} WINS THE MATCH!`;
+            if (p1SetsWon === 1 || p2SetsWon === 1) {
+                matchState.matchStatus = (p1SetsWon === 1) ? `${matchState.p1Name} WINS THE PRO-SET!` : `${matchState.p2Name} WINS THE PRO-SET!`;
                 updateMatchStatus(matchState.matchStatus, 'match-end');
                 disableButtons();
             } else {
@@ -437,38 +488,29 @@
             }
         }
 
-
-        /**
-         * Main function to handle a point scored by a player, including logging.
-         */
         window.recordPoint = function(winner) {
-            if (matchState.matchStatus.includes('WINS THE MATCH')) return;
+            if (matchState.matchStatus.includes('WINS THE PRO-SET')) return;
 
-            // 1. Save current state to history for undo
             matchState.history.push(JSON.parse(JSON.stringify(matchState)));
             document.getElementById('btn-undo').disabled = false;
 
-            // 2. Get logging details
             const pointType = document.getElementById('point-type').value;
-            // Ensure rally length is a positive integer
             const rallyLength = Math.max(1, parseInt(document.getElementById('rally-length').value) || 1);
 
             let winnerName = matchState[`p${winner}Name`];
             let pointDescription;
 
-            // 3. Apply point logic
             if (matchState.isTieBreak) {
                 handleTieBreakPoint(winner);
                 pointDescription = `Point in Tie-Break`;
             } else {
-                // No-Ad game scoring
                 if (winner === 1) {
                     matchState.p1Points++;
                 } else {
                     matchState.p2Points++;
                 }
                 
-                // NO-AD SCORING RULE
+                // Check for game end in No-Ad scoring
                 if (matchState.p1Points === 4) {
                     handleGameWin(1);
                 } else if (matchState.p2Points === 4) {
@@ -477,7 +519,6 @@
                 pointDescription = `Point (${POINT_MAP[matchState.p1Points] || 'Game End'}-${POINT_MAP[matchState.p2Points] || 'Game End'})`;
             }
 
-            // 4. Log the point
             const logEntry = {
                 id: Date.now(),
                 winner: winner,
@@ -487,28 +528,22 @@
                 description: pointDescription
             };
             
-            // The full log is in the history array, but we can also display a simple running log
             displayLogEntry(logEntry);
-
-            // 5. Render and save
             render();
             saveMatchState();
         }
 
-        /**
-         * Reverts the match state to the previous step in history.
-         */
         window.undoLastPoint = function() {
             if (matchState.history.length === 0) return;
 
             const previousState = matchState.history.pop();
             
-            // Deep copy the previous state back to the current state
+            // Restore all critical state variables
             Object.keys(previousState).forEach(key => {
                 matchState[key] = previousState[key];
             });
 
-            // Remove the last entry from the display log
+            // Update log display (remove the top item)
             const logEl = document.getElementById('point-log');
             if (logEl.firstChild && logEl.firstChild.tagName !== 'P') {
                 logEl.removeChild(logEl.firstChild);
@@ -517,12 +552,11 @@
                  logEl.innerHTML = '<p class="text-sm text-gray-500">No points recorded yet. Hit a point button to start logging!</p>';
             }
 
-            // Disable undo if history is empty
             if (matchState.history.length === 0) {
                 document.getElementById('btn-undo').disabled = true;
             }
 
-            checkMatchEnd();
+            checkMatchEnd(); // Re-evaluate match status
             updateMatchStatus('Last point undone.');
             render();
             saveMatchState();
@@ -530,22 +564,21 @@
         
         // --- UI Rendering ---
 
-        /**
-         * Renders the current state to the DOM.
-         */
         function render() {
             document.getElementById('p1-name').textContent = matchState.p1Name;
             document.getElementById('p2-name').textContent = matchState.p2Name;
 
-            // Set Scores
+            // Only render the first set (Pro-Set)
             document.getElementById('p1-set1').textContent = matchState.sets[0].p1;
             document.getElementById('p2-set1').textContent = matchState.sets[0].p2;
-            document.getElementById('p1-set2').textContent = matchState.sets[1].p1;
-            document.getElementById('p2-set2').textContent = matchState.sets[1].p2;
-            document.getElementById('p1-set3').textContent = matchState.sets[2].p1;
-            document.getElementById('p2-set3').textContent = matchState.sets[2].p2;
+            
+            // Set 2 & 3 are hidden by CSS, but ensure they don't break if logic accidentally tries to access them
+            if (document.getElementById('p1-set2')) document.getElementById('p1-set2').textContent = '-';
+            if (document.getElementById('p2-set2')) document.getElementById('p2-set2').textContent = '-';
+            if (document.getElementById('p1-set3')) document.getElementById('p1-set3').textContent = '-';
+            if (document.getElementById('p2-set3')) document.getElementById('p2-set3').textContent = '-';
 
-            // Current Game Score
+
             let p1CurrentPoints, p2CurrentPoints;
             if (matchState.isTieBreak) {
                 p1CurrentPoints = matchState.tieBreakScore.p1;
@@ -563,7 +596,7 @@
             p1GameEl.textContent = p1Text;
             p2GameEl.textContent = p2Text;
 
-            // Highlight Game Score based on status
+            // Dynamic styling based on score state
             p1GameEl.classList.remove('bg-yellow-50', 'text-yellow-700', 'bg-red-50', 'text-red-700', 'bg-green-50', 'text-green-700', 'bg-gray-200', 'text-gray-800');
             p2GameEl.classList.remove('bg-yellow-50', 'text-yellow-700', 'bg-red-50', 'text-red-700', 'bg-green-50', 'text-green-700', 'bg-gray-200', 'text-gray-800');
 
@@ -578,20 +611,14 @@
                 p2GameEl.classList.add('bg-red-50', 'text-red-700');
             }
             
-            // Re-apply "Point for Player X" text to buttons after rendering names
             document.getElementById('btn-p1').textContent = `Point for ${matchState.p1Name}`;
             document.getElementById('btn-p2').textContent = `Point for ${matchState.p2Name}`;
 
-            // Handle undo button state
-            document.getElementById('btn-undo').disabled = matchState.history.length === 0 || matchState.matchStatus.includes('WINS THE MATCH');
+            document.getElementById('btn-undo').disabled = matchState.history.length === 0 || matchState.matchStatus.includes('WINS THE PRO-SET');
         }
 
-        /**
-         * Displays a new entry in the point log.
-         */
         function displayLogEntry(entry) {
             const logEl = document.getElementById('point-log');
-            // Remove initial placeholder text
             if (logEl.firstChild && logEl.firstChild.tagName === 'P') {
                  logEl.innerHTML = '';
             }
@@ -599,7 +626,6 @@
             const logItem = document.createElement('div');
             logItem.className = `p-2 rounded-lg text-sm transition-all duration-300 ${entry.winner === 1 ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'}`;
             
-            // Updated Point Name Map
             const pointNameMap = { 
                 'W-G': 'Winner (Groundstroke)', 
                 'W-V': 'Winner (Volley)', 
@@ -620,13 +646,9 @@
                 </div>
             `;
             
-            // Add the newest entry to the top
             logEl.prepend(logItem);
         }
 
-        /**
-         * Updates the match status message with an optional type (used for styling).
-         */
         function updateMatchStatus(message, type = 'normal') {
             const statusEl = document.getElementById('match-status');
             statusEl.textContent = message;
@@ -638,17 +660,12 @@
             }
         }
 
-        /**
-         * Resets the match state, generates a new match ID, and prompts for new names.
-         */
         window.resetMatch = function() {
             matchState = {
                 p1Name: 'Player 1',
                 p2Name: 'Player 2',
                 sets: [
-                    { p1: 0, p2: 0 },
-                    { p1: 0, p2: 0 },
-                    { p1: 0, p2: 0 }
+                    { p1: 0, p2: 0 } // Reset to 1 set
                 ],
                 currentSetIndex: 0,
                 p1Points: 0,
@@ -656,41 +673,32 @@
                 isTieBreak: false,
                 tieBreakScore: { p1: 0, p2: 0 },
                 matchStatus: 'Ongoing',
-                maxSets: 3,
+                maxSets: 1, // Keep at 1
                 history: [],
-                // New random match ID for a new match
-                matchId: currentUserId + '-' + Math.random().toString(36).substring(2, 9),
-                userId: currentUserId
+                matchId: (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) ? (currentUserId + '-' + Math.random().toString(36).substring(2, 9)) : 'local-match',
+                userId: (IS_ENV_CONFIG_AVAILABLE || IS_MANUAL_CONFIG_AVAILABLE) ? currentUserId : 'local-user-id'
             };
             
-            // Clear the log display
             document.getElementById('point-log').innerHTML = '<p class="text-sm text-gray-500">No points recorded yet. Hit a point button to start logging!</p>';
 
             document.getElementById('match-id-display').textContent = matchState.matchId;
             enableButtons();
             showModal();
-            updateMatchStatus('New Match Ready. Enter names.');
+            updateMatchStatus('New Pro-Set Ready. Enter names.');
             render();
         }
 
-        /**
-         * Shows the name input modal.
-         */
         function showModal() {
             const modal = document.getElementById('modal');
             const p1Input = document.getElementById('p1-input');
             const p2Input = document.getElementById('p2-input');
 
-            // Pre-fill current names
             p1Input.value = matchState.p1Name === 'Player 1' ? '' : matchState.p1Name;
             p2Input.value = matchState.p2Name === 'Player 2' ? '' : matchState.p2Name;
 
             modal.style.display = 'flex';
         }
 
-        /**
-         * Saves the entered names, closes the modal, and saves state to DB.
-         */
         window.saveNames = function() {
             try {
                 const p1Input = document.getElementById('p1-input').value.trim() || 'Player 1';
@@ -699,13 +707,10 @@
                 matchState.p1Name = p1Input;
                 matchState.p2Name = p2Input;
 
-                console.log("Attempting to hide modal...");
                 document.getElementById('modal').style.display = 'none';
-                console.log("Modal hide instruction sent. Check if the modal disappeared.");
 
-                updateMatchStatus('Match is Active');
+                updateMatchStatus('Pro-Set is Active');
                 render();
-                // We call saveMatchState() asynchronously at the end.
                 saveMatchState();
 
             } catch (error) {
@@ -714,9 +719,6 @@
             }
         }
 
-        /**
-         * Disables the score buttons when the match ends or is initializing.
-         */
         function disableButtons() {
             document.getElementById('btn-p1').disabled = true;
             document.getElementById('btn-p2').disabled = true;
@@ -725,9 +727,6 @@
             document.getElementById('btn-p2').classList.add('opacity-50', 'cursor-not-allowed');
         }
 
-        /**
-         * Enables the score buttons after authentication/load.
-         */
         function enableButtons() {
             document.getElementById('btn-p1').disabled = false;
             document.getElementById('btn-p2').disabled = false;
