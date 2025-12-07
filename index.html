@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flexible Tennis Score Tracker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Google Inter Font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom styles for responsiveness and appearance */
+        .score-display { font-size: 2.5rem; }
+        .game-score-label { font-size: 1.25rem; }
+        .set-header { white-space: nowrap; }
+        /* Custom CSS to center and constrain the app */
+        #app-container {
+            max-width: 900px;
+            margin: auto;
+        }
+        /* Define column widths specifically to ensure alignment */
+        .w-1\/8 { width: 12.5%; }
+        .w-1\/4 { width: 25%; }
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 640px) {
+            .score-display { font-size: 2rem; }
+            .game-score-label { font-size: 1rem; }
+            .set-header, .set-score { padding: 0.5rem 0.25rem; }
+        }
+    </style>
+
+    <!-- Load Firebase v8 SDK for global access -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" crossorigin="anonymous" onerror="console.error('CRITICAL: Firebase App script failed to load.')"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" crossorigin="anonymous" onerror="console.error('CRITICAL: Firebase Auth script failed to load.')"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" crossorigin="anonymous" onerror="console.error('CRITICAL: Firebase Firestore script failed to load.')"></script>
+    
+    <!-- Load Firestore logging for debugging -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof firebase !== 'undefined' && firebase.firestore) {
+                firebase.firestore.setLogLevel('debug');
+            }
+        });
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 min-h-screen">
+
+    <div id="app-container">
+        <!-- Header and Status -->
+        <div class="mb-6 p-4 bg-white shadow-lg rounded-xl border border-gray-200">
+            <h1 class="text-3xl font-bold text-center text-indigo-700 mb-2">Tennis Score Tracker</h1>
+            <p id="match-status" class="text-center font-semibold text-sm"></p>
+            <div class="flex justify-center text-xs text-gray-500 space-x-4 mt-2">
+                <p>Match ID: <span id="match-id" class="font-mono text-indigo-600"></span></p>
+                <p>User ID: <span id="user-id" class="font-mono text-indigo-600"></span></p>
+                <!-- Live Duration Timer -->
+                <p id="live-duration-display" class="font-bold text-gray-700 hidden"></p>
+            </div>
+        </div>
+
+        <!-- Scoreboard Table (Initial style removed, controlled by JS) -->
+        <div id="scoreboard-section" class="bg-white shadow-xl rounded-xl overflow-hidden mb-6 hidden">
+            <table class="w-full text-center table-fixed">
+                <thead>
+                    <tr class="bg-indigo-600 text-white text-sm uppercase tracking-wider">
+                        <th class="w-1/4 p-3 set-header">Player</th>
+                        <th class="set-header w-1/8" data-set="1" id="header-set-1">Set 1</th>
+                        <th class="set-header w-1/8" data-set="2" id="header-set-2" style="display: none;">Set 2</th>
+                        <th class="set-header w-1/8" data-set="3" id="header-set-3" style="display: none;">Set 3</th>
+                        <th class="w-1/4 p-3 set-header" id="header-game-score">Game Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b border-gray-200 hover:bg-indigo-50 transition-colors">
+                        <td id="player1-name" class="p-3 font-semibold text-lg text-left pl-4 flex items-center justify-between">
+                            Player 1
+                            <span id="player1-serve" class="text-xl"></span>
+                        </td>
+                        <td id="player1-set1" class="set-score text-xl font-mono text-gray-900">0</td>
+                        <td id="player1-set2" class="set-score text-xl font-mono text-gray-900" style="display: none;">0</td>
+                        <td id="player1-set3" class="set-score text-xl font-mono text-gray-900" style="display: none;">0</td>
+                        <td id="player1-game-score" class="game-score-label p-3 font-bold text-indigo-600">Love</td>
+                    </tr>
+                    <tr class="hover:bg-indigo-50 transition-colors">
+                        <td id="player2-name" class="p-3 font-semibold text-lg text-left pl-4 flex items-center justify-between">
+                            Player 2
+                            <span id="player2-serve" class="text-xl"></span>
+                        </td>
+                        <td id="player2-set1" class="set-score text-xl font-mono text-gray-900">0</td>
+                        <td id="player2-set2" class="set-score text-xl font-mono text-gray-900" style="display: none;">0</td>
+                        <td id="player2-set3" class="set-score text-xl font-mono text-gray-900" style="display: none;">0</td>
+                        <td id="player2-game-score" class="game-score-label p-3 font-bold text-indigo-600">Love</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Point Entry and Control Panel (Initial style removed, controlled by JS) -->
+        <div id="control-panel" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+            
+            <!-- Point Selection/Logging -->
+            <div class="bg-white p-4 shadow-xl rounded-xl">
+                <h2 class="text-lg font-semibold mb-3 text-gray-700">Point Details</h2>
+                <div class="space-y-3">
+                    
+                    <!-- First Serve Result -->
+                    <div class="flex items-center space-x-3">
+                        <label for="first-serve-result" class="text-sm font-medium w-24">1st Serve:</label>
+                        <select id="first-serve-result" class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="IN">In</option>
+                            <option value="FAULT">Fault/Net</option>
+                            <option value="ACE">Ace</option>
+                        </select>
+                    </div>
+
+                    <!-- Rally Length -->
+                    <div class="flex items-center space-x-3">
+                        <label for="rally-length" class="text-sm font-medium w-24">Rally Length:</label>
+                        <input type="number" id="rally-length" value="1" min="1" class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+
+                    <!-- Point Type (Updated) -->
+                    <div class="flex items-center space-x-3">
+                        <label for="point-type" class="text-sm font-medium w-24">Point Type:</label>
+                        <select id="point-type" class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="W-G">Winner - Groundstroke (W-G)</option>
+                            <option value="W-V">Winner - Volley (W-V)</option>
+                            <option value="W-D">Winner - Drop Shot (W-D)</option>
+                            <option value="UE">Unforced Error (UE)</option>
+                            <option value="DF">Double Fault (DF)</option>
+                            <option value="ACE">Ace</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Point Buttons -->
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                    <button onclick="recordPointForPlayer(1)" id="point-p1-btn" class="p-3 bg-indigo-500 text-white rounded-lg font-bold shadow-md hover:bg-indigo-600 transition duration-150 active:scale-95 disabled:bg-gray-400">
+                        Point for Player 1
+                    </button>
+                    <button onclick="recordPointForPlayer(2)" id="point-p2-btn" class="p-3 bg-indigo-500 text-white rounded-lg font-bold shadow-md hover:bg-indigo-600 transition duration-150 active:scale-95 disabled:bg-gray-400">
+                        Point for Player 2
+                    </button>
+                </div>
+            </div>
+
+            <!-- History and Utility -->
+            <div class="bg-white p-4 shadow-xl rounded-xl">
+                <h2 class="text-lg font-semibold mb-3 text-gray-700">Utility & Sharing</h2>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <button onclick="undoLastPoint()" id="undo-btn" class="p-3 bg-yellow-500 text-white rounded-lg font-bold shadow-md hover:bg-yellow-600 transition duration-150 active:scale-95 disabled:bg-gray-400">
+                        Undo Last Point
+                    </button>
+                    <button onclick="endMatch()" id="end-match-btn" class="p-3 bg-orange-500 text-white rounded-lg font-bold shadow-md hover:bg-orange-600 transition duration-150 active:scale-95 disabled:bg-gray-400">
+                        End Match Manually
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="showMatchHistory()" id="history-btn" disabled class="p-3 bg-gray-400 text-white rounded-lg font-bold shadow-md transition duration-150 disabled:bg-gray-400">
+                        View Match History
+                    </button>
+                    <button onclick="showMatchAnalytics()" id="analytics-btn" disabled class="p-3 bg-teal-500 text-white rounded-lg font-bold shadow-md hover:bg-teal-600 transition duration-150 active:scale-95 disabled:bg-gray-400">
+                        View Match Analytics
+                    </button>
+                </div>
+                <button onclick="exportMatchData()" id="export-btn" disabled class="mt-3 w-full p-3 bg-cyan-600 text-white rounded-lg font-bold shadow-md hover:bg-cyan-700 transition duration-150 active:scale-95 disabled:bg-gray-400">
+                    Export Match Data (CSV)
+                </button>
+
+                <div class="mt-4 border-t pt-3 h-40 overflow-y-scroll text-sm bg-gray-50 p-2 rounded-lg">
+                    <h3 class="font-semibold text-gray-700 sticky top-0 bg-gray-50">Point Log (Last 10)</h3>
+                    <ul id="point-log" class="space-y-1"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: Live Scoreboard Log Area for Spectator Mode (Always visible if match is playing) -->
+        <div id="spectator-log-area" class="mt-6 p-4 bg-white shadow-xl rounded-xl hidden">
+            <h2 class="text-lg font-semibold mb-3 text-gray-700">Live Point Log</h2>
+            <div class="h-40 overflow-y-scroll text-sm bg-gray-50 p-2 rounded-lg">
+                <ul id="spectator-point-log" class="space-y-1"></ul>
+            </div>
+            <!-- FIXED: Copy Link Button is here and wired up correctly for Spectator URL -->
+            <button onclick="copySpectatorLink()" id="copy-link-btn" class="mt-4 w-full p-3 bg-green-500 text-white rounded-lg font-bold shadow-md hover:bg-green-600 transition duration-150">
+                Copy Live Score URL
+            </button>
+        </div>
+
+
+        <!-- New Match / Reset Button -->
+        <div class="mt-6">
+            <button onclick="resetMatch()" class="w-full p-4 bg-red-600 text-white rounded-xl font-extrabold shadow-xl hover:bg-red-700 transition duration-150 active:scale-95">
+                Start New Match
+            </button>
+        </div>
+
+        <!-- Modals -->
+
+        <!-- 1. Setup Modal (Visible on load) -->
+        <div id="setup-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4">
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+                <h2 class="text-2xl font-bold mb-4 text-center text-indigo-700">Start New Match</h2>
+                <div class="space-y-4">
+                    <input type="text" id="player1-name-input" placeholder="Player 1 Name (e.g., Nadal)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="text" id="player2-name-input" placeholder="Player 2 Name (e.g., Djokovic)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    
+                    <!-- LOCATION FIELD -->
+                    <input type="text" id="match-location-input" placeholder="Match Location (e.g., Central Park Courts)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+
+                    <h3 class="font-semibold pt-2 text-gray-700">Select Match Format:</h3>
+                    <div class="flex flex-col space-y-2 p-3 bg-indigo-50 rounded-lg">
+                        <label class="flex items-center space-x-3">
+                            <input type="radio" name="match-format" value="pro-set-no-ad" class="form-radio text-indigo-600">
+                            <span class="text-sm font-medium">Single Pro-Set (8 Games, No-Ad)</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="radio" name="match-format" value="pro-set-ad" checked class="form-radio text-indigo-600">
+                            <span class="text-sm font-medium">Single Pro-Set (8 Games, Ad Scoring)</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="radio" name="match-format" value="best-of-3-no-ad" class="form-radio text-indigo-600">
+                            <span class="text-sm font-medium">Best-of-3 Sets (6 Games, No-Ad)</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="radio" name="match-format" value="best-of-3-ad" class="form-radio text-indigo-600">
+                            <span class="text-sm font-medium">Best-of-3 Sets (6 Games, Ad Scoring)</span>
+                        </label>
+                    </div>
+
+                    <h3 class="font-semibold pt-2 text-gray-700">Starting Server:</h3>
+                    <div class="flex justify-around p-3 bg-indigo-50 rounded-lg">
+                        <label class="flex items-center space-x-2">
+                            <input type="radio" name="starting-server" value="1" checked class="form-radio text-indigo-600">
+                            <span class="text-sm font-medium" id="server-p1-label">Player 1</span>
+                        </label>
+                        <label class="flex items-center space-x-2">
+                            <input type="radio" name="starting-server" value="2" class="form-radio text-indigo-600">
+                            <span class="text-sm font-medium" id="server-p2-label">Player 2</span>
+                        </label>
+                    </div>
+
+
+                    <button onclick="saveNames()" class="w-full p-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition">
+                        Start Match
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Match History Modal -->
+        <div id="history-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4" style="display: none;">
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-indigo-700">Match History</h2>
+                    <button onclick="hideHistoryModal()" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                <div id="match-list" class="max-h-96 overflow-y-auto space-y-2 p-2 border rounded-lg bg-gray-50">
+                    <p class="text-center text-gray-500">Loading matches...</p>
+                </div>
+                <p id="history-error" class="text-red-500 text-sm mt-3" style="display: none;"></p>
+            </div>
+        </div>
+
+        <!-- 3. Match Analytics Modal -->
+        <div id="analytics-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4" style="display: none;">
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-indigo-700">Match Analytics</h2>
+                    <button onclick="hideAnalyticsModal()" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                <div id="analytics-content" class="max-h-96 overflow-y-auto space-y-4 p-2">
+                    <p class="text-center text-gray-500">No points recorded yet.</p>
+                </div>
+                <!-- Full Point History Log -->
+                <div class="mt-6 border-t pt-4">
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">Full Point History Log</h3>
+                    <div class="log-container border rounded-lg bg-gray-50 p-2">
+                        <ul id="full-history-log" class="space-y-1"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- START OF FIREBASE CONFIGURATION ---
+        // 1. Manually set your Firebase Config here. This is necessary for GitHub Pages.
+        const MANUAL_FIREBASE_CONFIG = {
+             apiKey: "AIzaSyBOdTC5Q8MmbDhlNGlpm-EFQgJFZebIUZI",
+             authDomain: "tennis-score-tracker-bd317.firebaseapp.com",
+             projectId: "tennis-score-tracker-bd317",
+             storageBucket: "tennis-score-tracker-bd317.firebasestorage.app",
+             messagingSenderId: "301275539476",
+             appId: "1:301275539476:web:6ae1032d7d23f7c699df01",
+             measurementId: "G-5XY6ES44VR"
+        };
+
+        // 2. Determine if we can use environment config (Canvas) or must use manual config (GitHub/External).
+        const IS_ENV_CONFIG_AVAILABLE = typeof __firebase_config !== 'undefined';
+        const IS_MANUAL_CONFIG_AVAILABLE = MANUAL_FIREBASE_CONFIG.projectId && MANUAL_FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY_HERE";
+
+        // Global variables determined by environment vs. manual config
+        const appId = IS_ENV_CONFIG_AVAILABLE ? (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id') : (MANUAL_FIREBASE_CONFIG.projectId || 'default-app-id');
+        const firebaseConfig = IS_ENV_CONFIG_AVAILABLE ? JSON.parse(__firebase_config) : MANUAL_FIREBASE_CONFIG;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+        
+        // --- Global Variable Declarations (Fixes ReferenceError in Preview) ---
+        let db, auth;
+        let currentUserId = "Local User";
+        let currentMatchId = "undefined-1g7mux1";
+        let unsubscribeMatchListener = null;
+        let isLocalMode = false;
+        let liveDurationInterval = null; // CRITICAL FIX: Must be declared globally
+        
+        const GAME_SCORES = { 0: 'Love', 1: '15', 2: '30', 3: '40', 4: 'Ad' }; // Added Ad for rendering
+        const MAX_HISTORY_LENGTH = 100; // Limit history saved to DB for performance
+
+        let matchState = {
+            id: currentMatchId,
+            player1Name: 'Player 1',
+            player2Name: 'Player 2',
+            location: '', // Location field
+            startTime: null, // Match start time
+            endTime: null,   // Match end time
+            score: [0, 0], // Current game score (points: 0-4)
+            games: [
+                [0, 0], // Set 1 Games
+                [0, 0], // Set 2 Games
+                [0, 0]  // Set 3 Games
+            ],
+            setsWon: [0, 0], // Total sets won
+            currentSet: 0, // 0, 1, or 2
+            currentServer: 1, // 1 or 2
+            matchFormat: 'pro-set-ad', // Updated default format
+            matchStatus: 'SETUP', // SETUP, PLAYING, ENDED, ENDED_MANUALLY
+            history: [], // Stores full state history for undo/analytics
+            isTieBreak: false
+        };
+
+        // --- Core Scoring Logic ---
+
+        function getMatchConfig() {
+            const format = matchState.matchFormat;
+            const adScoring = format.endsWith('ad');
+            const isProSet = format.startsWith('pro-set');
+
+            if (isProSet) {
+                return { maxSets: 1, winGames: 8, tieBreakAt: 8, adScoring: adScoring };
+            } // best-of-3
+            return { maxSets: 3, winGames: 6, tieBreakAt: 6, adScoring: adScoring };
+        }
+
+        function checkGameWin() {
+            const [p1Score, p2Score] = matchState.score;
+            const { adScoring } = getMatchConfig();
+
+            if (matchState.isTieBreak) {
+                if (p1Score >= 7 && p1Score >= p2Score + 2) return 1;
+                if (p2Score >= 7 && p2Score >= p1Score + 2) return 2;
+                return 0;
+            }
+
+            if (adScoring) {
+                if (p1Score >= 4 && p1Score >= p2Score + 2) return 1;
+                if (p2Score >= 4 && p2Score >= p1Score + 2) return 2;
+                return 0;
+            } else {
+                // No-Ad Scoring
+                if (p1Score >= 4 || p2Score >= 4) {
+                    if (p1Score === p2Score) return 0; 
+                    if (p1Score > p2Score) return 1;
+                    return 2;
+                }
+                return 0;
+            }
+        }
+
+        function checkSetWin() {
+            const setIndex = matchState.currentSet;
+            const gamesArray = Array.isArray(matchState.games) ? matchState.games : JSON.parse(matchState.games);
+            const [p1Games, p2Games] = gamesArray[setIndex];
+            const { winGames, tieBreakAt } = getMatchConfig();
+
+            if (p1Games >= winGames || p2Games >= winGames) {
+                if (Math.abs(p1Games - p2Games) >= 2) {
+                    return p1Games > p2Games ? 1 : 2;
+                }
+                
+                if (p1Games === tieBreakAt && p2Games === tieBreakAt) {
+                    matchState.isTieBreak = true;
+                }
+            }
+            return 0;
+        }
+
+        function checkMatchEnd() {
+            const p1Sets = matchState.setsWon[0];
+            const p2Sets = matchState.setsWon[1];
+            const { maxSets } = getMatchConfig();
+            
+            const setsRequiredToWin = (maxSets === 1) ? 1 : 2; 
+
+            if (p1Sets === setsRequiredToWin || p2Sets === setsRequiredToWin) {
+                // Record the end time if not already set
+                if (!matchState.endTime) {
+                    matchState.endTime = Date.now();
+                }
+                return true;
+            }
+            return false;
+        }
+
+        function handleGameWin(winner) {
+            const setIndex = matchState.currentSet;
+            const winnerIndex = winner - 1;
+
+            const gamesArray = Array.isArray(matchState.games) ? matchState.games : JSON.parse(matchState.games);
+
+            gamesArray[setIndex][winnerIndex]++;
+            matchState.games = gamesArray;
+
+            matchState.score = [0, 0];
+            matchState.isTieBreak = false;
+
+            matchState.currentServer = (matchState.currentServer === 1) ? 2 : 1;
+            
+            const setWinner = checkSetWin();
+            if (setWinner !== 0) {
+                handleSetWin(setWinner);
+            }
+        }
+
+        function handleSetWin(winner) {
+            const winnerIndex = winner - 1;
+            
+            matchState.setsWon[winnerIndex]++;
+            
+            if (checkMatchEnd()) {
+                matchState.matchStatus = 'ENDED';
+            } else {
+                matchState.currentSet++;
+            }
+        }
+
+        function handlePoint(winner) {
+            if (matchState.matchStatus !== 'PLAYING') return;
+            const { adScoring } = getMatchConfig();
+            const winnerIndex = winner - 1;
+            
+            if (matchState.isTieBreak) {
+                matchState.score[winnerIndex]++;
+            } else if (adScoring) {
+                // Ad Scoring Logic
+                if (matchState.score[0] === 3 && matchState.score[1] === 3) { // Deuce
+                    matchState.score[winnerIndex] = 4; // Advantage
+                } else if (matchState.score[0] === 4 && matchState.score[1] === 4) {
+                    matchState.score[0] = matchState.score[1] = 3;
+                } else if (matchState.score[0] === 4 || matchState.score[1] === 4) {
+                    if (matchState.score[winnerIndex] === 4) { // Ad player wins
+                        matchState.score[winnerIndex]++; 
+                    } else { // Non-Ad player wins (back to Deuce)
+                        matchState.score[0] = matchState.score[1] = 3;
+                    }
+                } else {
+                    matchState.score[winnerIndex]++; // Normal scoring (Love, 15, 30)
+                }
+            } else {
+                // No-Ad Scoring Logic
+                 matchState.score[winnerIndex]++;
+            }
+
+            const gameWinner = checkGameWin();
+            if (gameWinner !== 0) {
+                handleGameWin(gameWinner);
+            }
+        }
+
+        // --- Timer and Utility Functions ---
+
+        function formatDuration(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            
+            const parts = [];
+            if (hours > 0) parts.push(`${hours}h`);
+            parts.push(`${minutes}m`);
+            if (hours === 0) parts.push(`${seconds}s`);
+
+            return parts.join(' ');
+        }
+
+        function startLiveDurationTimer() {
+            if (liveDurationInterval) clearInterval(liveDurationInterval);
+            
+            const timerEl = document.getElementById('live-duration-display');
+            if (!matchState.startTime) {
+                 timerEl.style.display = 'none';
+                 return;
+            }
+
+            timerEl.style.display = 'inline';
+
+            liveDurationInterval = setInterval(() => {
+                let endTime = matchState.endTime || Date.now();
+                let duration = endTime - matchState.startTime;
+
+                if (matchState.matchStatus !== 'PLAYING' && !matchState.endTime) {
+                    matchState.endTime = endTime; 
+                    duration = endTime - matchState.startTime;
+                    saveMatchState(); 
+                }
+
+                if (duration > 0) {
+                    timerEl.textContent = `Duration: ${formatDuration(duration)}`;
+                }
+                
+                if (matchState.matchStatus !== 'PLAYING' && matchState.endTime) {
+                    clearInterval(liveDurationInterval);
+                }
+            }, 1000);
+        }
+        
+        function copySpectatorLink() {
+             const spectatorUrl = `${window.location.origin}${window.location.pathname}?matchId=${matchState.id}&mode=spectate`;
+             
+             // Use temporary input to copy to clipboard
+             const tempInput = document.createElement('input');
+             document.body.appendChild(tempInput);
+             tempInput.value = spectatorUrl;
+             tempInput.select();
+             document.execCommand('copy');
+             document.body.removeChild(tempInput);
+             
+             alert('Live Spectator URL copied to clipboard! Share this link with your spectator.');
+        }
+
+        // --- UI Rendering Functions ---
+
+        function renderScoreboard() {
+            const setIndex = matchState.currentSet;
+            const p1Score = matchState.score[0];
+            const p2Score = matchState.score[1];
+
+            const gamesArray = Array.isArray(matchState.games) ? matchState.games : JSON.parse(matchState.games);
+            const maxSets = matchState.matchFormat.startsWith('pro-set') ? 1 : 3;
+            const { adScoring } = getMatchConfig();
+
+
+            // 1. Update Names and Server
+            document.getElementById('player1-name').innerHTML = `${matchState.player1Name} <span id="player1-serve" class="text-xl"></span>`;
+            document.getElementById('player2-name').innerHTML = `${matchState.player2Name} <span id="player2-serve" class="text-xl"></span>`;
+
+            document.getElementById('player1-serve').textContent = matchState.currentServer === 1 ? '🎾' : '';
+            document.getElementById('player2-serve').textContent = matchState.currentServer === 2 ? '🎾' : '';
+            
+            // 2. Handle Set Columns Visibility (THE ALIGNMENT FIX)
+            document.querySelectorAll('[data-set]').forEach(el => {
+                const setNum = parseInt(el.getAttribute('data-set'));
+                el.style.display = setNum > maxSets ? 'none' : 'table-cell';
+            });
+
+
+            // 3. Update Set Scores
+            for (let i = 0; i < 3; i++) {
+                const p1El = document.getElementById(`player1-set${i + 1}`);
+                const p2El = document.getElementById(`player2-set${i + 1}`);
+                if (i < maxSets) {
+                    p1El.textContent = gamesArray[i][0];
+                    p2El.textContent = gamesArray[i][1];
+                } else {
+                    p1El.textContent = '';
+                    p2El.textContent = '';
+                }
+            }
+
+
+            // 4. Update Game Score
+            let p1GameText, p2GameText;
+
+            if (matchState.isTieBreak) {
+                p1GameText = p1Score;
+                p2GameText = p2Score;
+            } else if (adScoring) {
+                // Ad Scoring Rendering (0, 1, 2, 3, 4, 5...)
+                if (p1Score === 3 && p2Score === 3) {
+                    p1GameText = p2GameText = 'Deuce';
+                } else if (p1Score === 4 && p2Score === 3) {
+                    p1GameText = 'Ad'; p2GameText = '40';
+                } else if (p2Score === 4 && p1Score === 3) {
+                    p2GameText = 'Ad'; p1GameText = '40';
+                } else if (p1Score > 4 || p2Score > 4) {
+                    p1GameText = p1Score > p2Score ? 'Game' : '40';
+                    p2GameText = p2Score > p1Score ? 'Game' : '40';
+                } else {
+                    p1GameText = GAME_SCORES[p1Score];
+                    p2GameText = GAME_SCORES[p2Score];
+                }
+            } else {
+                // No-Ad Scoring Rendering (0, 1, 2, 3)
+                if (p1Score === 3 && p2Score === 3) {
+                    p1GameText = p2GameText = 'Deciding Point';
+                } else if (p1Score > 3 || p2Score > 3) { // After 40, next point wins in No-Ad
+                    p1GameText = p1Score > p2Score ? 'Game' : '40';
+                    p2GameText = p2Score > p1Score ? 'Game' : '40';
+                } else {
+                    p1GameText = GAME_SCORES[p1Score];
+                    p2GameText = GAME_SCORES[p2Score];
+                }
+            }
+
+            document.getElementById('player1-game-score').textContent = p1GameText;
+            document.getElementById('player2-game-score').textContent = p2GameText;
+        }
+
+        function renderMatchStatus() {
+            const statusElement = document.getElementById('match-status');
+            const p1Sets = matchState.setsWon[0];
+            const p2Sets = matchState.setsWon[1];
+            const p1Name = matchState.player1Name;
+            const p2Name = matchState.player2Name;
+
+            // Stop timer if match is over
+            if (matchState.matchStatus !== 'PLAYING' && liveDurationInterval) {
+                 clearInterval(liveDurationInterval);
+                 document.getElementById('live-duration-display').style.display = 'inline';
+            }
+
+            if (matchState.matchStatus === 'ENDED') {
+                const winner = p1Sets > p2Sets ? p1Name : p2Name;
+                statusElement.className = 'text-center font-bold text-xl text-green-700';
+                statusElement.textContent = `MATCH ENDED! Winner: ${winner}`;
+            } else if (matchState.matchStatus === 'ENDED_MANUALLY') {
+                statusElement.className = 'text-center font-bold text-xl text-orange-700';
+                statusElement.textContent = `MATCH ENDED MANUALLY`;
+            } else if (matchState.matchStatus === 'PLAYING') {
+                statusElement.className = 'text-center font-semibold text-sm text-gray-700';
+                const formatDisplay = matchState.matchFormat.includes('pro-set') ? 'Pro-Set' : 'Best-of-3';
+                const scoringDisplay = matchState.matchFormat.includes('ad') ? 'Ad Scoring' : 'No-Ad';
+                const locationDisplay = matchState.location ? ` @ ${matchState.location}` : '';
+                statusElement.textContent = `PLAYING | ${formatDisplay} (${scoringDisplay}) | Sets: ${p1Sets} - ${p2Sets}${locationDisplay}`;
+            } else {
+                statusElement.className = 'text-center font-semibold text-sm text-gray-700';
+                statusElement.textContent = `Awaiting Match Start`;
+            }
+        }
+
+        function renderPointLog() {
+            const logElement = document.getElementById('point-log');
+            const spectatorLogElement = document.getElementById('spectator-point-log');
+            logElement.innerHTML = '';
+            spectatorLogElement.innerHTML = '';
+            
+            const p1 = matchState.player1Name;
+            const p2 = matchState.player2Name;
+            
+            const logEntries = matchState.history.slice().reverse(); // Reverse for newest first
+
+            logEntries.forEach(entry => {
+                const li = document.createElement('li');
+                li.className = 'border-b border-gray-100 py-1 text-xs';
+                
+                const winnerName = entry.winner === 1 ? p1 : p2;
+                
+                const gamesArray = Array.isArray(entry.gamesBefore) ? entry.gamesBefore : JSON.parse(entry.gamesBefore);
+                const setGameDisplay = `${gamesArray[entry.currentSet][0]}-${gamesArray[entry.currentSet][1]}`;
+                
+                const serveDisplay = entry.firstServeResult ? ` (1st: ${entry.firstServeResult})` : '';
+
+                li.innerHTML = `
+                    <span class="font-bold text-indigo-700">${winnerName}</span>
+                    <span class="text-gray-600">(${entry.pointType})</span>
+                    won point for ${setGameDisplay}. Rally: ${entry.rallyLength}.${serveDisplay}
+                `;
+                
+                // Add to both logs
+                // Note: The main point log is filtered visually using CSS/JS slice
+                if (logElement.children.length < 10) {
+                     logElement.appendChild(li.cloneNode(true)); // Limited log (live scorer)
+                }
+                spectatorLogElement.appendChild(li); // Full log (spectator/analytics)
+            });
+        }
+        
+        function updateUI() {
+            renderScoreboard();
+            renderMatchStatus();
+            renderPointLog();
+            startLiveDurationTimer();
+            
+            const isPlaying = matchState.matchStatus === 'PLAYING';
+            const canUndo = matchState.history.length > 0;
+            const needsSetup = matchState.matchStatus === 'SETUP';
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const isSpectatorMode = urlParams.get('mode') === 'spectate';
+
+            // --- UI Visibility ---
+            const controlPanelEl = document.getElementById('control-panel');
+            const spectatorLogEl = document.getElementById('spectator-log-area');
+            const scoreboardEl = document.getElementById('scoreboard-section');
+            const setupModalEl = document.getElementById('setup-modal');
+            const historyBtn = document.getElementById('history-btn');
+
+            // Set Initial visibility based on authentication status and mode
+            if (isSpectatorMode) {
+                // SPECTATOR MODE: Only show scoreboard and log, hide all buttons/controls
+                controlPanelEl.classList.add('hidden');
+                spectatorLogEl.classList.remove('hidden');
+                scoreboardEl.classList.remove('hidden');
+                setupModalEl.style.display = 'none';
+
+                // Set history button to exit mode
+                historyBtn.textContent = "Exit Spectator Mode";
+                historyBtn.onclick = () => { window.location.search = `?matchId=${matchState.id}`; };
+
+            } else {
+                 // SCORER MODE: Hide/Show based on SETUP vs PLAYING
+                 setupModalEl.style.display = needsSetup ? 'flex' : 'none';
+                 controlPanelEl.classList.toggle('hidden', needsSetup);
+                 scoreboardEl.classList.toggle('hidden', needsSetup);
+                 spectatorLogEl.classList.toggle('hidden', needsSetup);
+
+                 // Set history button back to normal
+                 historyBtn.textContent = "View Match History";
+                 historyBtn.onclick = window.showMatchHistory; 
+
+                 // Update server labels on setup modal
+                 document.getElementById('server-p1-label').textContent = matchState.player1Name;
+                 document.getElementById('server-p2-label').textContent = matchState.player2Name;
+            }
+
+
+            // --- Button State Control (applies to scorer only) ---
+            const isMatchOver = matchState.matchStatus.includes('ENDED');
+            
+            if (!isSpectatorMode) {
+                document.getElementById('point-p1-btn').disabled = !isPlaying;
+                document.getElementById('point-p2-btn').disabled = !isPlaying;
+                document.getElementById('undo-btn').disabled = !canUndo || isMatchOver;
+                document.getElementById('end-match-btn').disabled = isMatchOver;
+            }
+
+            const analyticsExportReady = canUndo || isMatchOver;
+
+            document.getElementById('analytics-btn').disabled = !analyticsExportReady;
+            document.getElementById('export-btn').disabled = !analyticsExportReady;
+            document.getElementById('history-btn').disabled = isLocalMode;
+        }
+
+
+        // --- Firestore Management Functions ---
+        
+        async function saveMatchState() {
+            if (isLocalMode || !db) {
+                console.warn("Local Mode: Skipping database save.");
+                return;
+            }
+
+            try {
+                const stateToSave = { ...matchState };
+                stateToSave.history = stateToSave.history.slice(-MAX_HISTORY_LENGTH); 
+
+                stateToSave.games = JSON.stringify(matchState.games);
+                stateToSave.history = stateToSave.history.map(entry => ({
+                    ...entry,
+                    gamesBefore: JSON.stringify(entry.gamesBefore)
+                }));
+                
+                if (!matchState.timestamp) {
+                    stateToSave.timestamp = firebase.firestore.FieldValue.serverTimestamp(); 
+                }
+
+                const path = `artifacts/${appId}/public/data/tennis_matches`;
+                const docRef = firebase.firestore().collection(path).doc(matchState.id);
+                
+                await docRef.set(stateToSave, { merge: true });
+                console.log(`Match state saved to Firestore: ${matchState.id}`);
+
+            } catch (error) {
+                console.error("Firestore Save Error:", error);
+            }
+        }
+
+        function setupRealtimeListener(matchId) {
+            if (unsubscribeMatchListener) {
+                clearInterval(liveDurationInterval); // Stop timer on listener change
+                unsubscribeMatchListener();
+                unsubscribeMatchListener = null;
+            }
+            if (isLocalMode || !db) return;
+
+            const path = `artifacts/${appId}/public/data/tennis_matches`;
+            const docRef = firebase.firestore().collection(path).doc(matchId);
+            
+            unsubscribeMatchListener = docRef.onSnapshot(docSnap => {
+                if (docSnap.exists) { 
+                    const data = docSnap.data();
+                    if (data) {
+                        data.games = JSON.parse(data.games);
+                        data.history = data.history.map(entry => ({
+                            ...entry,
+                            gamesBefore: entry.gamesBefore ? JSON.parse(entry.gamesBefore) : [[0,0], [0,0], [0,0]] 
+                        }));
+                        
+                        matchState = data;
+                        updateUI();
+                        console.log(`Match state loaded from Firestore: ${matchState.id}`);
+                        
+                        // FIX: Hide the setup modal if match was loaded successfully
+                        if (matchState.matchStatus !== 'SETUP') {
+                            document.getElementById('setup-modal').style.display = 'none';
+                        }
+                    }
+                } else {
+                    console.warn(`Match document ${matchId} does not exist. Initializing new match document.`);
+                    saveMatchState();
+                }
+            }, error => {
+                console.error("Firestore Listener Error:", error);
+                isLocalMode = true;
+                document.getElementById('history-error').textContent = `DB Error: Listener failed. Running in Local Mode.`;
+                document.getElementById('history-error').style.display = 'block';
+                updateUI();
+            });
+        }
+        
+        // --- Initialization and Auth ---
+
+        async function initFirebase() {
+            if (typeof firebase === 'undefined' || !firebase.initializeApp) {
+                console.error("CRITICAL: Firebase libraries are not loaded correctly.");
+                isLocalMode = true;
+                document.getElementById('user-id').textContent = "Local Mode Active";
+                updateUI();
+                return;
+            }
+            
+            if (!IS_ENV_CONFIG_AVAILABLE && !IS_MANUAL_CONFIG_AVAILABLE) {
+                console.error("CRITICAL: Firebase config not available.");
+                isLocalMode = true;
+                document.getElementById('user-id').textContent = "Local Mode Active";
+                updateUI();
+                return;
+            }
+
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const requestedMatchId = urlParams.get('matchId');
+                
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        document.getElementById('user-id').textContent = currentUserId;
+                        isLocalMode = false; 
+
+                        currentMatchId = requestedMatchId || `${currentUserId}-${Date.now().toString().slice(-6)}`;
+                        document.getElementById('match-id').textContent = currentMatchId;
+
+                        matchState.id = currentMatchId;
+                        setupRealtimeListener(currentMatchId);
+                        
+                    } else {
+                        try {
+                            if (initialAuthToken) {
+                                await auth.signInWithCustomToken(initialAuthToken);
+                            } else {
+                                await auth.signInAnonymously();
+                            }
+                        } catch (error) {
+                            console.error("Firebase Auth Error: Failed to sign in.", error);
+                            isLocalMode = true;
+                            document.getElementById('user-id').textContent = "Local Mode Failed";
+                            updateUI();
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("CRITICAL: Firebase Initialization Failed.", error);
+                isLocalMode = true;
+                document.getElementById('user-id').textContent = "Init Failed";
+                updateUI();
+            }
+        }
+        
+        window.addEventListener('load', initFirebase);
+
+
+        // --- Global Event Handlers ---
+
+        window.saveNames = function() {
+            try {
+                const p1Name = document.getElementById('player1-name-input').value.trim() || 'Player 1';
+                const p2Name = document.getElementById('player2-name-input').value.trim() || 'Player 2';
+                const location = document.getElementById('match-location-input').value.trim() || ''; 
+                const format = document.querySelector('input[name="match-format"]:checked').value;
+                const startingServer = parseInt(document.querySelector('input[name="starting-server"]:checked').value);
+
+
+                // Reset state for new match
+                matchState = {
+                    id: currentMatchId,
+                    player1Name: p1Name,
+                    player2Name: p2Name,
+                    location: location, 
+                    startTime: Date.now(), // NEW: Record start time
+                    endTime: null,
+                    score: [0, 0],
+                    games: [[0, 0], [0, 0], [0, 0]],
+                    setsWon: [0, 0],
+                    currentSet: 0,
+                    currentServer: startingServer, // Use selected server
+                    matchFormat: format,
+                    matchStatus: 'PLAYING',
+                    history: [],
+                    isTieBreak: false,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp() 
+                };
+                
+                saveNamesAndLabels(p1Name, p2Name); // Update labels before saving
+                saveMatchState();
+                document.getElementById('setup-modal').style.display = 'none';
+                updateUI();
+                
+            } catch (e) {
+                console.error("Critical Error in saveNames function:", e);
+            }
+        };
+        
+        function saveNamesAndLabels(p1Name, p2Name) {
+             document.getElementById('server-p1-label').textContent = p1Name;
+             document.getElementById('server-p2-label').textContent = p2Name;
+        }
+
+        window.recordPointForPlayer = function(winner) {
+            if (matchState.matchStatus !== 'PLAYING') return;
+
+            const rallyLength = parseInt(document.getElementById('rally-length').value) || 1;
+            const pointType = document.getElementById('point-type').value;
+            const firstServeResult = document.getElementById('first-serve-result').value;
+
+            const historyEntry = {
+                scoreBefore: [...matchState.score],
+                gamesBefore: JSON.parse(JSON.stringify(matchState.games)),
+                setsWonBefore: [...matchState.setsWon],
+                currentSet: matchState.currentSet,
+                rallyLength: rallyLength,
+                pointType: pointType,
+                firstServeResult: firstServeResult,
+                winner: winner,
+                server: matchState.currentServer
+            };
+
+            handlePoint(winner);
+
+            matchState.history.push(historyEntry);
+            
+            saveMatchState();
+            updateUI();
+        };
+
+        window.undoLastPoint = function() {
+            if (matchState.history.length === 0) return;
+
+            const lastEntry = matchState.history.pop();
+
+            matchState.score = lastEntry.scoreBefore;
+            matchState.games = Array.isArray(lastEntry.gamesBefore) ? lastEntry.gamesBefore : JSON.parse(lastEntry.gamesBefore);
+            matchState.setsWon = lastEntry.setsWonBefore;
+            matchState.currentSet = lastEntry.currentSet;
+            matchState.currentServer = lastEntry.server; 
+            matchState.isTieBreak = false; 
+            matchState.matchStatus = 'PLAYING'; 
+
+            saveMatchState();
+            updateUI();
+        };
+
+        window.resetMatch = function() {
+            window.location.href = window.location.pathname;
+        };
+        
+        window.endMatch = function() {
+            if (matchState.matchStatus !== 'PLAYING') return;
+            
+            matchState.matchStatus = 'ENDED_MANUALLY';
+            matchState.endTime = Date.now(); // Record end time
+            saveMatchState();
+            updateUI();
+        }
+
+        // --- Modals and Analytics ---
+
+        window.showMatchHistory = async function() {
+            if (isLocalMode) return;
+            
+            document.getElementById('history-modal').style.display = 'flex';
+            const matchListDiv = document.getElementById('match-list');
+            const historyError = document.getElementById('history-error');
+            matchListDiv.innerHTML = '<p class="text-center text-gray-500">Loading matches...</p>';
+            historyError.style.display = 'none';
+
+            try {
+                const path = `artifacts/${appId}/public/data/tennis_matches`;
+                const q = firebase.firestore().collection(path)
+                    .where('matchStatus', 'in', ['ENDED', 'ENDED_MANUALLY', 'PLAYING'])
+                    .orderBy('timestamp', 'desc');
+
+                const snapshot = await q.get();
+
+                if (snapshot.empty) {
+                    matchListDiv.innerHTML = '<p class="text-center text-gray-500 font-semibold">No matches found for this user.</p>';
+                    return;
+                }
+                
+                matchListDiv.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const item = document.createElement('div');
+                    item.className = 'p-3 bg-white rounded-lg shadow border border-gray-100 hover:bg-indigo-50 cursor-pointer transition';
+                    item.onclick = () => loadMatchById(doc.id);
+                    
+                    const score = data.setsWon[0] + data.setsWon[1] > 0 ? `${data.setsWon[0]}-${data.setsWon[1]}` : 'In Progress';
+                    const status = data.matchStatus === 'PLAYING' ? `<span class="text-yellow-600">Playing</span>` : (data.matchStatus === 'ENDED_MANUALLY' ? `<span class="text-orange-600">Manual End</span>` : `<span class="text-green-600">Ended</span>`);
+                    const format = data.matchFormat.includes('pro-set') ? 'Pro-Set' : 'Best-of-3';
+                    const locationDisplay = data.location ? ` @ ${data.location}` : '';
+
+                    item.innerHTML = `
+                        <p class="font-bold text-lg">${data.player1Name} vs ${data.player2Name}${locationDisplay}</p>
+                        <p class="text-sm text-gray-600">${format} | Sets: ${score} | Status: ${status}</p>
+                    `;
+                    matchListDiv.appendChild(item);
+                });
+
+            } catch (error) {
+                console.error("Failed to load match history:", error);
+                historyError.textContent = `Error loading history: ${error.message}`;
+                historyError.style.display = 'block';
+                matchListDiv.innerHTML = '<p class="text-center text-red-500">Failed to connect to archive.</p>';
+            }
+        };
+
+        function loadMatchById(id) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            window.location.search = `?matchId=${id}${mode ? '&mode=' + mode : ''}`;
+        }
+
+        window.hideHistoryModal = function() {
+            document.getElementById('history-modal').style.display = 'none';
+        };
+        
+        // --- Analytics ---
+        
+        function calculateAnalytics() {
+            const stats = {
+                p1: { totalPoints: 0, w: 0, ue: 0, df: 0, ace: 0, wg: 0, wv: 0, wd: 0, onServeWin: 0, onServeTotal: 0, firstServeIn: 0, firstServeFault: 0, firstServeAce: 0 },
+                p2: { totalPoints: 0, w: 0, ue: 0, df: 0, ace: 0, wg: 0, wv: 0, wd: 0, onServeWin: 0, onServeTotal: 0, firstServeIn: 0, firstServeFault: 0, firstServeAce: 0 },
+                rallyTotal: 0
+            };
+
+            if (matchState.history.length === 0) return stats;
+
+            matchState.history.forEach(point => {
+                const winner = point.winner === 1 ? 'p1' : 'p2';
+                const loser = point.winner === 1 ? 'p2' : 'p1';
+                const server = point.server === 1 ? 'p1' : 'p2';
+                
+                stats.rallyTotal += point.rallyLength;
+                stats[winner].totalPoints++;
+
+                // Tracking points won on serve
+                stats[server].onServeTotal++;
+                if (server === winner) {
+                    stats[server].onServeWin++;
+                }
+
+                // Tracking First Serve Results 
+                if (point.firstServeResult === 'IN') stats[server].firstServeIn++;
+                if (point.firstServeResult === 'FAULT') stats[server].firstServeFault++;
+                if (point.firstServeResult === 'ACE') stats[server].firstServeAce++;
+
+
+                // Tracking point types (Updated: ACE replaces FE)
+                switch (point.pointType) {
+                    case 'W-G': stats[winner].wg++; stats[winner].w++; break;
+                    case 'W-V': stats[winner].wv++; stats[winner].w++; break;
+                    case 'W-D': stats[winner].wd++; stats[winner].w++; break;
+                    case 'UE': stats[loser].ue++; break;
+                    case 'DF': stats[loser].df++; break;
+                    case 'ACE': stats[winner].ace++; stats[winner].w++; break;
+                }
+            });
+
+            const totalPoints = matchState.history.length;
+            stats.avgRallyLength = totalPoints > 0 ? (stats.rallyTotal / totalPoints).toFixed(1) : 0;
+            
+            const calculateServePercentage = (pStats) => {
+                // First serve attempts are IN + FAULT + ACE
+                const attempts = pStats.firstServeIn + pStats.firstServeFault + pStats.firstServeAce;
+                return attempts > 0 ? (((pStats.firstServeIn + pStats.firstServeAce) / attempts) * 100).toFixed(1) : 0;
+            };
+
+            stats.p1.winPercentOnServe = stats.p1.onServeTotal > 0 ? ((stats.p1.onServeWin / stats.p1.onServeTotal) * 100).toFixed(1) : 0;
+            stats.p2.winPercentOnServe = stats.p2.onServeTotal > 0 ? ((stats.p2.onServeWin / stats.p2.onServeTotal) * 100).toFixed(1) : 0;
+            stats.p1.firstServePercent = calculateServePercentage(stats.p1);
+            stats.p2.firstServePercent = calculateServePercentage(stats.p2);
+
+
+            // Calculate time metrics
+            const totalGames = matchState.setsWon[0] + matchState.setsWon[1] + (matchState.games[matchState.currentSet][0] + matchState.games[matchState.currentSet][1]);
+            const durationMs = matchState.endTime ? matchState.endTime - matchState.startTime : Date.now() - matchState.startTime;
+            const avgTimePerGame = totalGames > 0 ? formatDuration(durationMs / totalGames) : formatDuration(0);
+
+            stats.timeMetrics = {
+                 totalDuration: formatDuration(durationMs),
+                 totalGames: totalGames,
+                 avgTimePerGame: avgTimePerGame
+            };
+
+
+            return stats;
+        }
+
+        function renderAnalytics(stats) {
+            const content = document.getElementById('analytics-content');
+            
+            if (matchState.history.length === 0) {
+                content.innerHTML = '<p class="text-center text-gray-500">Record points to see analytics.</p>';
+                return;
+            }
+
+            const p1 = matchState.player1Name;
+            const p2 = matchState.player2Name;
+            
+            const renderTable = (title, headers, data) => `
+                <h3 class="text-xl font-semibold mt-4 mb-2 text-gray-700">${title}</h3>
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <thead>
+                        <tr class="bg-gray-100 text-left text-sm font-medium text-gray-600">
+                            ${headers.map(h => `<th class="p-3">${h}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                            <tr class="border-t border-gray-100 hover:bg-gray-50">
+                                ${row.map((cell, index) => `<td class="p-3 ${index > 0 ? 'font-mono' : 'font-semibold'}">${cell}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            // --- Time and Pace Metrics ---
+            const timeHeaders = ['Metric', 'Value'];
+            const timeData = [
+                ['Total Duration', stats.timeMetrics.totalDuration],
+                ['Total Games Played', stats.timeMetrics.totalGames],
+                ['Avg Time Per Game', stats.timeMetrics.avgTimePerGame],
+                ['Avg Rally Length', `${stats.avgRallyLength} shots`]
+            ];
+            
+
+            // --- Point Breakdown Table ---
+            const pointBreakdownHeaders = ['Type', p1, p2];
+            const pointBreakdownData = [
+                ['Total Winners (W-G, W-V, W-D, ACE)', stats.p1.w, stats.p2.w],
+                ['Ace', stats.p1.ace, stats.p2.ace],
+                ['Groundstroke Winner (W-G)', stats.p1.wg, stats.p2.wg],
+                ['Volley Winner (W-V)', stats.p1.wv, stats.p2.wv],
+                ['Drop Shot Winner (W-D)', stats.p1.wd, stats.p2.wd],
+                ['Unforced Error (UE)', stats.p1.ue, stats.p2.ue],
+                ['Double Fault (DF)', stats.p1.df, stats.p2.df],
+                ['Total Points Scored', stats.p1.totalPoints, stats.p2.totalPoints],
+            ];
+            
+            // --- Serve Stats Table ---
+            const serveStatsHeaders = ['Metric', p1, p2];
+            const serveStatsData = [
+                ['Points Won On Serve (%)', stats.p1.winPercentOnServe + '%', stats.p2.winPercentOnServe + '%'],
+                ['First Serve In (%)', stats.p1.firstServePercent + '%', stats.p2.firstServePercent + '%'],
+                ['Aces', stats.p1.ace, stats.p2.ace],
+                ['Double Faults', stats.p1.df, stats.p2.df],
+            ];
+
+            content.innerHTML = `
+                ${renderTable('Match Pace & Duration', timeHeaders, timeData)}
+                ${renderTable('Point Breakdown', pointBreakdownHeaders, pointBreakdownData)}
+                ${renderTable('Serve Performance', serveStatsHeaders, serveStatsData)}
+                
+                <h3 class="text-xl font-semibold mt-6 mb-3 text-gray-700 border-t pt-4">Point-by-Point Timeline (Oldest First)</h3>
+                <ol class="log-container space-y-1 pl-4 list-decimal">
+                    ${matchState.history.map((point, index) => {
+                        const winnerName = point.winner === 1 ? p1 : p2;
+                        const serverName = point.server === 1 ? p1 : p2;
+                        const gamesArray = Array.isArray(point.gamesBefore) ? point.gamesBefore : JSON.parse(point.gamesBefore);
+                        const scoreDisplay = `${gamesArray[point.currentSet][0]}-${gamesArray[point.currentSet][1]}`;
+
+                        return `
+                            <li class="p-1 border-b border-gray-200">
+                                <span class="font-bold text-indigo-700">${index + 1}.</span> 
+                                <span class="font-semibold">${winnerName}</span> won with a <span class="text-blue-600">${point.pointType}</span> 
+                                (Server: ${serverName}, 1st Serve: ${point.firstServeResult || 'N/A'}) at score ${scoreDisplay}. Rally: ${point.rallyLength}.
+                            </li>
+                        `;
+                    }).join('')}
+                </ol>
+            `;
+        }
+
+
+        window.showMatchAnalytics = function() {
+            document.getElementById('analytics-modal').style.display = 'flex';
+            const stats = calculateAnalytics();
+            renderAnalytics(stats);
+        };
+
+        window.hideAnalyticsModal = function() {
+            document.getElementById('analytics-modal').style.display = 'none';
+        };
+
+        // --- Export ---
+        
+        function convertToCSV(history) {
+            const headers = [
+                "Index", "MatchID", "Format", "Location", "Winner", "Loser", "SetScore", 
+                "RallyLength", "PointType", "FirstServeResult", "Server", 
+                "P1_GamesBefore", "P2_GamesBefore"
+            ];
+
+            let csv = headers.join(',') + '\n';
+            
+            const p1 = matchState.player1Name;
+            const p2 = matchState.player2Name;
+            
+            history.forEach((point, index) => {
+                const winnerName = point.winner === 1 ? p1 : p2;
+                const loserName = point.winner === 1 ? p2 : p1;
+                const serverName = point.server === 1 ? p1 : p2;
+                
+                const gamesArray = Array.isArray(point.gamesBefore) ? point.gamesBefore : JSON.parse(point.gamesBefore);
+                const currentSetIndex = point.currentSet;
+                const setScore = `${gamesArray[currentSetIndex][0]}-${gamesArray[currentSet][1]}`;
+                
+                const firstServeResult = point.firstServeResult || 'N/A';
+
+                const row = [
+                    index + 1,
+                    matchState.id,
+                    matchState.matchFormat,
+                    matchState.location, 
+                    winnerName,
+                    loserName,
+                    setScore,
+                    point.rallyLength,
+                    point.pointType,
+                    firstServeResult, 
+                    serverName,
+                    gamesArray[currentSetIndex][0],
+                    gamesArray[currentSetIndex][1]
+                ];
+                csv += row.map(item => `"${item}"`).join(',') + '\n'; // Quote items to handle commas in location/names
+            });
+            return csv;
+        }
+
+        window.exportMatchData = function() {
+            if (matchState.history.length === 0) {
+                alert("Cannot export an empty match.");
+                return;
+            }
+
+            const csvContent = convertToCSV(matchState.history);
+            const filename = `${matchState.player1Name}-vs-${matchState.player2Name}-Match-Data-${new Date().toISOString().slice(0, 10)}.csv`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const link = document.createElement("a");
+            
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+                window.open(encodedUri);
+            }
+        };
+
+    </script>
+</body>
+</html>
