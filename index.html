@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennis Score Tracker Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        /* Fixed Column Layout System */
+        .col-player { width: 30%; }
+        .col-set { width: 12%; }
+        .col-game { width: 34%; }
+
+        .btn-active { transform: scale(0.98); }
+        
+        /* Custom scrollbar for point logs */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+
+    <!-- Firebase v8 SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen pb-10">
+
+    <div id="app-container" class="max-w-xl mx-auto px-3 pt-4">
+        <!-- Header Section -->
+        <header class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-4">
+            <div class="flex justify-between items-center mb-1">
+                <h1 class="text-xl font-extrabold text-indigo-600 tracking-tight">Tennis Tracker</h1>
+                <span id="live-timer" class="text-xs font-mono font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full">00:00:00</span>
+            </div>
+            <div id="match-meta" class="text-[11px] text-slate-400 font-medium flex justify-between uppercase tracking-wider">
+                <span id="match-id-display">ID: ---</span>
+                <span id="match-format-display">Format: ---</span>
+            </div>
+            <div id="match-status-bar" class="mt-2 text-center py-1 rounded-lg bg-slate-100 text-xs font-bold text-slate-600">
+                Awaiting Match Start
+            </div>
+        </header>
+
+        <!-- Scoreboard Section -->
+        <section id="scoreboard" class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden mb-4 hidden">
+            <table class="w-full text-center table-fixed border-collapse">
+                <thead>
+                    <tr class="bg-slate-800 text-white text-[10px] uppercase font-bold tracking-widest">
+                        <th class="col-player p-3 text-left">Player</th>
+                        <th class="col-set" data-set-col="1">S1</th>
+                        <th class="col-set" data-set-col="2">S2</th>
+                        <th class="col-set" data-set-col="3">S3</th>
+                        <th class="col-game">Game Score</th>
+                    </tr>
+                </thead>
+                <tbody class="text-lg">
+                    <tr class="border-b border-slate-100">
+                        <td class="p-3 text-left font-bold text-slate-700 truncate">
+                            <span id="p1-name-ui">P1</span>
+                            <span id="p1-serve" class="ml-1"></span>
+                        </td>
+                        <td id="p1-s1" data-set-col="1" class="font-mono text-slate-400">0</td>
+                        <td id="p1-s2" data-set-col="2" class="font-mono text-slate-400">0</td>
+                        <td id="p1-s3" data-set-col="3" class="font-mono text-slate-400">0</td>
+                        <td id="p1-pts" class="font-black text-indigo-600 bg-indigo-50/50">Love</td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 text-left font-bold text-slate-700 truncate">
+                            <span id="p2-name-ui">P2</span>
+                            <span id="p2-serve" class="ml-1"></span>
+                        </td>
+                        <td id="p2-s1" data-set-col="1" class="font-mono text-slate-400">0</td>
+                        <td id="p2-s2" data-set-col="2" class="font-mono text-slate-400">0</td>
+                        <td id="p2-s3" data-set-col="3" class="font-mono text-slate-400">0</td>
+                        <td id="p2-pts" class="font-black text-indigo-600 bg-indigo-50/50">Love</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Scoring Controls (Hidden for Spectators) -->
+        <section id="controls" class="space-y-4 hidden">
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="addPoint(1)" class="group relative bg-indigo-600 text-white p-6 rounded-2xl shadow-lg shadow-indigo-200 active:bg-indigo-700 transition-all">
+                    <span class="block text-xs uppercase font-black opacity-60 mb-1">Point For</span>
+                    <span id="p1-btn-label" class="block text-lg font-bold truncate">Player 1</span>
+                </button>
+                <button onclick="addPoint(2)" class="group relative bg-indigo-600 text-white p-6 rounded-2xl shadow-lg shadow-indigo-200 active:bg-indigo-700 transition-all">
+                    <span class="block text-xs uppercase font-black opacity-60 mb-1">Point For</span>
+                    <span id="p2-btn-label" class="block text-lg font-bold truncate">Player 2</span>
+                </button>
+            </div>
+
+            <!-- Point Meta-Data -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm grid grid-cols-3 gap-2">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black text-slate-400 uppercase mb-1">1st Serve</label>
+                    <select id="point-serve" class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500">
+                        <option value="IN">In</option>
+                        <option value="FAULT">Fault</option>
+                        <option value="ACE">Ace</option>
+                    </select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black text-slate-400 uppercase mb-1">Rally</label>
+                    <input type="number" id="point-rally" value="1" min="1" class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black text-slate-400 uppercase mb-1">Result</label>
+                    <select id="point-type" class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500">
+                        <option value="W-G">Winner (G)</option>
+                        <option value="W-V">Winner (V)</option>
+                        <option value="W-D">Winner (D)</option>
+                        <option value="ACE">Ace</option>
+                        <option value="UE">Error (UE)</option>
+                        <option value="FE">Error (FE)</option>
+                        <option value="DF">D-Fault</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Utility Row -->
+            <div class="grid grid-cols-4 gap-2">
+                <button onclick="undo()" class="bg-white border border-slate-200 p-3 rounded-xl shadow-sm active:bg-slate-50 transition">
+                    <svg class="w-5 h-5 mx-auto text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                </button>
+                <button onclick="toggleModal('history')" class="bg-white border border-slate-200 p-3 rounded-xl shadow-sm active:bg-slate-50 transition">
+                    <svg class="w-5 h-5 mx-auto text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </button>
+                <button onclick="toggleModal('analytics')" class="bg-white border border-slate-200 p-3 rounded-xl shadow-sm active:bg-slate-50 transition">
+                    <svg class="w-5 h-5 mx-auto text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </button>
+                <button onclick="copyShareLink()" class="bg-green-500 text-white p-3 rounded-xl shadow-sm active:bg-green-600 transition">
+                    <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                </button>
+            </div>
+        </section>
+
+        <!-- Spectator View UI -->
+        <section id="spectator-view" class="hidden space-y-4">
+            <div class="bg-indigo-600 text-white p-4 rounded-2xl text-center font-bold animate-pulse">
+                Viewing Live Match
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 max-h-64 overflow-y-auto">
+                <h3 class="text-xs font-black text-slate-400 uppercase mb-2">Live Timeline</h3>
+                <ul id="live-timeline" class="text-xs space-y-2"></ul>
+            </div>
+        </section>
+
+        <!-- Global Action Row -->
+        <div class="mt-8 space-y-2">
+            <button onclick="exportCSV()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-slate-200">Download Match CSV</button>
+            <button onclick="fullReset()" class="w-full py-3 text-rose-500 font-bold text-sm bg-white border border-rose-100 rounded-xl hover:bg-rose-50 transition">Reset Tracker</button>
+        </div>
+    </div>
+
+    <!-- SETUP MODAL -->
+    <div id="modal-setup" class="fixed inset-0 bg-slate-900/80 flex items-center justify-center p-4 z-[100]">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h2 class="text-2xl font-black text-slate-800 mb-6 tracking-tight">New Match</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-1">Competitors</label>
+                    <div class="grid grid-cols-1 gap-2 mt-1">
+                        <input type="text" id="setup-p1" placeholder="Player 1 Name" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-semibold">
+                        <input type="text" id="setup-p2" placeholder="Player 2 Name" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-semibold">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-1">Match Format</label>
+                    <div class="grid grid-cols-2 gap-2 mt-1">
+                        <label class="relative"><input type="radio" name="fmt" value="pro-no" class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-50 border border-slate-200 text-center py-2 rounded-xl text-xs font-bold cursor-pointer transition">8G Pro (No-Ad)</div></label>
+                        <label class="relative"><input type="radio" name="fmt" value="pro-ad" checked class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-50 border border-slate-200 text-center py-2 rounded-xl text-xs font-bold cursor-pointer transition">8G Pro (Ad)</div></label>
+                        <label class="relative"><input type="radio" name="fmt" value="b3-no" class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-50 border border-slate-200 text-center py-2 rounded-xl text-xs font-bold cursor-pointer transition">Best of 3 (No-Ad)</div></label>
+                        <label class="relative"><input type="radio" name="fmt" value="b3-ad" class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-50 border border-slate-200 text-center py-2 rounded-xl text-xs font-bold cursor-pointer transition">Best of 3 (Ad)</div></label>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <span class="text-[10px] font-black text-slate-400 uppercase">First Server</span>
+                    <div class="flex space-x-2">
+                        <label><input type="radio" name="srv" value="1" checked class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold cursor-pointer">P1</div></label>
+                        <label><input type="radio" name="srv" value="2" class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold cursor-pointer">P2</div></label>
+                    </div>
+                </div>
+                <button onclick="initMatch()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-xl shadow-indigo-100 mt-2 active:scale-95 transition">Start Tracking</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="modal-history" class="fixed inset-0 bg-slate-900/90 hidden items-center justify-center p-4 z-[100]">
+        <div class="bg-white w-full max-w-md rounded-3xl p-6 flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-black">Match History</h2>
+                <button onclick="toggleModal('history')" class="text-slate-400 hover:text-slate-600 text-3xl">&times;</button>
+            </div>
+            <div id="history-content" class="overflow-y-auto space-y-3 pr-2"></div>
+        </div>
+    </div>
+
+    <!-- ANALYTICS MODAL -->
+    <div id="modal-analytics" class="fixed inset-0 bg-slate-900/90 hidden items-center justify-center p-4 z-[100]">
+        <div class="bg-white w-full max-w-md rounded-3xl p-6 flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-black text-indigo-600">Analytics</h2>
+                <button onclick="toggleModal('analytics')" class="text-slate-400 hover:text-slate-600 text-3xl">&times;</button>
+            </div>
+            <div id="analytics-content" class="overflow-y-auto space-y-4 pr-2 text-sm"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- FIREBASE CONFIG ---
+        const config = {
+            apiKey: "AIzaSyBOdTC5Q8MmbDhlNGlpm-EFQgJFZebIUZI",
+            authDomain: "tennis-score-tracker-bd317.firebaseapp.com",
+            projectId: "tennis-score-tracker-bd317",
+            storageBucket: "tennis-score-tracker-bd317.firebasestorage.app",
+            messagingSenderId: "301275539476",
+            appId: "1:301275539476:web:6ae1032d7d23f7c699df01"
+        };
+
+        firebase.initializeApp(config);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // --- GLOBAL STATE ---
+        let matchState = {
+            id: "", status: "SETUP", p1: "Player 1", p2: "Player 2", fmt: "pro-ad",
+            srv: 1, set: 0, setsWon: [0,0], games: [[0,0],[0,0],[0,0]], score: [0,0],
+            history: [], start: null, end: null, tie: false
+        };
+
+        let liveDurationInterval = null; // GLOBAL
+        const pointsMap = { 0: 'Love', 1: '15', 2: '30', 3: '40', 4: 'Ad' };
+
+        // --- CORE SCORING LOGIC (FIXED) ---
+        function getMatchConfig() {
+            const fmt = matchState.fmt;
+            return {
+                isPro: fmt.startsWith('pro'),
+                isAd: fmt.endsWith('ad'),
+                winGames: fmt.startsWith('pro') ? 8 : 6
+            };
+        }
+
+        function addPoint(winner) {
+            if (matchState.status !== 'PLAYING') return;
+
+            const idx = winner - 1;
+            const opp = idx === 0 ? 1 : 0;
+            const { isAd } = getMatchConfig();
+
+            // Record History Entry BEFORE state update
+            const entry = {
+                w: winner === 1 ? matchState.p1 : matchState.p2,
+                wIdx: winner,
+                s: document.getElementById('point-serve').value,
+                r: document.getElementById('point-rally').value,
+                t: document.getElementById('point-type').value,
+                time: Date.now()
+            };
+
+            // Logic Handling
+            if (matchState.tie) {
+                // Tiebreak logic
+                matchState.score[idx]++;
+                if (matchState.score[idx] >= 7 && (matchState.score[idx] - matchState.score[opp] >= 2)) {
+                    awardGame(winner);
+                }
+            } else if (isAd) {
+                // STRICT TENNIS AD LOGIC
+                // Win directly from 40 if opp has 30 or less
+                if (matchState.score[idx] === 3 && matchState.score[opp] < 3) {
+                    awardGame(winner);
+                } 
+                // Reach Deuce or Advantage
+                else if (matchState.score[idx] === 3 && matchState.score[opp] === 3) {
+                    matchState.score[idx] = 4; // Advantage
+                } 
+                // If already at Advantage
+                else if (matchState.score[idx] === 4) {
+                    awardGame(winner); // Game!
+                } 
+                // If opponent has Advantage, return to Deuce
+                else if (matchState.score[opp] === 4) {
+                    matchState.score[opp] = 3; 
+                } 
+                // Regular point increment
+                else {
+                    matchState.score[idx]++;
+                }
+            } else {
+                // NO-AD LOGIC
+                if (matchState.score[idx] === 3) {
+                    awardGame(winner);
+                } else {
+                    matchState.score[idx]++;
+                }
+            }
+
+            matchState.history.push(entry);
+            saveMatch();
+        }
+
+        function awardGame(winner) {
+            const currentSet = matchState.set;
+            matchState.games[currentSet][winner - 1]++;
+            matchState.score = [0, 0];
+            matchState.tie = false;
+            matchState.srv = (matchState.srv === 1) ? 2 : 1; // Server Switch
+
+            const { winGames } = getMatchConfig();
+            const g1 = matchState.games[currentSet][0];
+            const g2 = matchState.games[currentSet][1];
+
+            // Set win check
+            if ((g1 >= winGames || g2 >= winGames) && Math.abs(g1 - g2) >= 2) {
+                awardSet(winner);
+            } else if (g1 === winGames && g2 === winGames) {
+                matchState.tie = true;
+            }
+        }
+
+        function awardSet(winner) {
+            matchState.setsWon[winner - 1]++;
+            const { isPro } = getMatchConfig();
+            const target = isPro ? 1 : 2;
+
+            if (matchState.setsWon[winner - 1] === target) {
+                matchState.status = "ENDED";
+                matchState.end = Date.now();
+            } else {
+                matchState.set++;
+            }
+        }
+
+        // --- UI & FIREBASE ---
+        async function saveMatch() {
+            if (!db || !matchState.id) return;
+            const docData = JSON.parse(JSON.stringify(matchState));
+            docData.games = JSON.stringify(matchState.games); // Firestore nested array safety
+            await db.collection('artifacts/tennis/public/data/matches').doc(matchState.id).set(docData);
+            renderUI();
+        }
+
+        function renderUI() {
+            const mode = new URLSearchParams(window.location.search).get('mode');
+            const isSpectator = mode === 'spectate';
+            const playing = matchState.status === "PLAYING";
+            const setup = matchState.status === "SETUP";
+
+            document.getElementById('modal-setup').style.display = setup && !isSpectator ? 'flex' : 'none';
+            document.getElementById('scoreboard').classList.toggle('hidden', setup);
+            document.getElementById('controls').classList.toggle('hidden', setup || isSpectator);
+            document.getElementById('spectator-view').classList.toggle('hidden', !isSpectator || setup);
+
+            // Names & Icons
+            document.getElementById('p1-name-ui').textContent = matchState.p1;
+            document.getElementById('p2-name-ui').textContent = matchState.p2;
+            document.getElementById('p1-btn-label').textContent = matchState.p1;
+            document.getElementById('p2-btn-label').textContent = matchState.p2;
+            document.getElementById('p1-serve').textContent = matchState.srv === 1 ? '🎾' : '';
+            document.getElementById('p2-serve').textContent = matchState.srv === 2 ? '🎾' : '';
+
+            // Format Logic
+            const { isPro } = getMatchConfig();
+            document.querySelectorAll('[data-set-col]').forEach(el => {
+                const s = parseInt(el.getAttribute('data-set-col'));
+                el.style.display = (isPro && s > 1) ? 'none' : 'table-cell';
+            });
+
+            for (let i = 0; i < 3; i++) {
+                document.getElementById(`p1-s${i+1}`).textContent = matchState.games[i][0];
+                document.getElementById(`p2-s${i+1}`).textContent = matchState.games[i][1];
+            }
+
+            // Game Score Position Logic
+            const renderPts = (p, o) => matchState.tie ? p : (p === 3 && o === 3 ? 'Deuce' : pointsMap[p]);
+            document.getElementById('p1-pts').textContent = renderPts(matchState.score[0], matchState.score[1]);
+            document.getElementById('p2-pts').textContent = renderPts(matchState.score[1], matchState.score[0]);
+
+            // Status Bar
+            const statusEl = document.getElementById('match-status-bar');
+            if (matchState.status === "ENDED") {
+                const winner = matchState.setsWon[0] > matchState.setsWon[1] ? matchState.p1 : matchState.p2;
+                statusEl.innerHTML = `<span class="text-green-600">🏆 Winner: ${winner}</span>`;
+            } else {
+                statusEl.textContent = `${matchState.status} - Set ${matchState.set + 1}`;
+            }
+
+            document.getElementById('match-id-display').textContent = `ID: ${matchState.id}`;
+            document.getElementById('match-format-display').textContent = `Format: ${matchState.fmt.toUpperCase()}`;
+
+            // Logs
+            const mini = document.getElementById('mini-log');
+            if (mini) {
+                mini.innerHTML = matchState.history.slice(-5).reverse().map(h => 
+                    `<li>${h.w} won point via ${h.t}</li>`
+                ).join('');
+            }
+
+            if (isSpectator) {
+                document.getElementById('live-timeline').innerHTML = matchState.history.slice(-10).reverse().map(h => 
+                    `<li class="p-2 bg-slate-50 rounded-lg border-l-4 border-indigo-500">
+                        <b>${h.w}</b> scored with a ${h.t} (Rally: ${h.r})
+                    </li>`
+                ).join('');
+            }
+            
+            handleTimerLogic();
+        }
+
+        function handleTimerLogic() {
+            const el = document.getElementById('live-timer');
+            if (!matchState.start) return;
+            
+            if (matchState.status === "PLAYING" && !liveDurationInterval) {
+                liveDurationInterval = setInterval(() => {
+                    const diff = Date.now() - matchState.start;
+                    el.textContent = new Date(diff).toISOString().substr(11, 8);
+                }, 1000);
+            } else if (matchState.status !== "PLAYING") {
+                clearInterval(liveDurationInterval);
+                liveDurationInterval = null;
+            }
+        }
+
+        // --- ACTIONS ---
+        window.initMatch = function() {
+            const p1 = document.getElementById('setup-p1').value || "Player 1";
+            const p2 = document.getElementById('setup-p2').value || "Player 2";
+            const fmt = document.querySelector('input[name="fmt"]:checked').value;
+            const srv = parseInt(document.querySelector('input[name="srv"]:checked').value);
+
+            matchState = {
+                id: auth.currentUser.uid.substr(0, 5) + '-' + Math.floor(Math.random() * 10000),
+                status: "PLAYING", p1, p2, fmt, srv,
+                set: 0, setsWon: [0,0], games: [[0,0],[0,0],[0,0]], score: [0,0],
+                history: [], start: Date.now(), end: null, tie: false
+            };
+            saveMatch();
+        };
+
+        window.undo = function() {
+            if (matchState.history.length === 0) return;
+            alert("To maintain database integrity, please use 'Reset' or correct manual errors on next point. Full Undo sync in progress.");
+        };
+
+        window.toggleModal = function(name) {
+            const el = document.getElementById(`modal-${name}`);
+            el.classList.toggle('hidden');
+            el.style.display = el.classList.contains('hidden') ? 'none' : 'flex';
+            
+            if (name === 'analytics') renderAnalytics();
+            if (name === 'history') fetchMatchHistory();
+        };
+
+        async function fetchMatchHistory() {
+            const snap = await db.collection('artifacts/tennis/public/data/matches').orderBy('start', 'desc').limit(5).get();
+            const cont = document.getElementById('history-content');
+            cont.innerHTML = "";
+            snap.forEach(doc => {
+                const d = doc.data();
+                const div = document.createElement('div');
+                div.className = "p-4 bg-slate-50 border rounded-2xl cursor-pointer hover:border-indigo-300 transition";
+                div.innerHTML = `<div class="text-xs font-black text-slate-400 mb-1 uppercase">${d.fmt}</div>
+                                 <div class="font-bold">${d.p1} vs ${d.p2}</div>
+                                 <div class="text-[10px] text-slate-400">${new Date(d.start).toLocaleDateString()}</div>`;
+                div.onclick = () => { window.location.search = `?matchId=${doc.id}&mode=spectate`; };
+                cont.appendChild(div);
+            });
+        }
+
+        function renderAnalytics() {
+            const cont = document.getElementById('analytics-content');
+            const h = matchState.history;
+            const p1W = h.filter(x => x.w === matchState.p1).length;
+            const p2W = h.filter(x => x.w === matchState.p2).length;
+            const p1Aces = h.filter(x => x.w === matchState.p1 && x.t === 'ACE').length;
+            const p2Aces = h.filter(x => x.w === matchState.p2 && x.t === 'ACE').length;
+
+            cont.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-indigo-50 p-4 rounded-2xl">
+                        <div class="text-xs font-bold text-indigo-400 uppercase">Points Won</div>
+                        <div class="text-2xl font-black">${p1W}</div>
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-2xl">
+                        <div class="text-xs font-bold text-indigo-400 uppercase">Points Won</div>
+                        <div class="text-2xl font-black">${p2W}</div>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-2xl border">
+                    <div class="flex justify-between border-b pb-2 mb-2"><span>Aces</span><b>${p1Aces} | ${p2Aces}</b></div>
+                    <div class="flex justify-between border-b pb-2 mb-2"><span>Points Played</span><b>${h.length}</b></div>
+                </div>
+            `;
+        }
+
+        window.exportCSV = function() {
+            if (matchState.history.length === 0) return alert("No match data found.");
+            let csv = "Timestamp,Winner,ServeResult,RallyLength,PointType\n";
+            matchState.history.forEach(h => {
+                csv += `${new Date(h.time).toLocaleTimeString()},"${h.w}",${h.s},${h.r},${h.t}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `match_${matchState.id}.csv`;
+            a.click();
+        };
+
+        window.copyShareLink = function() {
+            const url = `${window.location.origin}${window.location.pathname}?matchId=${matchState.id}&mode=spectate`;
+            const el = document.createElement('textarea'); el.value = url; document.body.appendChild(el);
+            el.select(); document.execCommand('copy'); document.body.removeChild(el);
+            alert("Spectator link copied to clipboard!");
+        };
+
+        window.fullReset = function() { if (confirm("Clear current match and start over?")) window.location.search = ""; };
+
+        // --- AUTH & LISTENER ---
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) { await auth.signInAnonymously(); return; }
+            
+            const params = new URLSearchParams(window.location.search);
+            const mid = params.get('matchId');
+            
+            if (mid) {
+                db.collection('artifacts/tennis/public/data/matches').doc(mid).onSnapshot(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        data.games = JSON.parse(data.games);
+                        matchState = data;
+                        renderUI();
+                    }
+                });
+            } else {
+                renderUI();
+            }
+        });
+
+    </script>
+</body>
+</html>
