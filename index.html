@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennis Score Tracker Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        /* Rigid 5-Column Grid System: Name | S1 | S2 | S3 | Game Score */
+        .score-grid {
+            display: grid;
+            grid-template-columns: 2.5fr 0.8fr 0.8fr 0.8fr 2fr;
+            align-items: center;
+            text-align: center;
+        }
+
+        .custom-shadow { box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1); }
+        .modal-overlay { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); }
+        .debug-text { font-family: 'Courier New', Courier, monospace; font-size: 11px; }
+        
+        /* Scrollbar for logs */
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+
+    <!-- Firebase v8 SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen pb-12">
+
+    <div id="app-container" class="max-w-lg mx-auto px-4 pt-6">
+        <!-- Header Section -->
+        <header class="bg-white rounded-3xl p-5 mb-4 border border-slate-200 custom-shadow">
+            <div class="flex justify-between items-center mb-2">
+                <h1 class="text-2xl font-black text-indigo-700 tracking-tighter">Tennis Tracker</h1>
+                <div id="timer-display" class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-black font-mono">00:00:00</div>
+            </div>
+            <div class="flex justify-between text-[9px] text-slate-400 font-bold uppercase tracking-widest border-t border-slate-50 pt-3">
+                <span id="meta-id">Match: ---</span>
+                <span id="meta-loc">Loc: ---</span>
+            </div>
+        </header>
+
+        <!-- Scoreboard -->
+        <section id="scoreboard-area" class="bg-white rounded-3xl overflow-hidden mb-4 border border-slate-200 shadow-xl hidden">
+            <div class="score-grid bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest p-3">
+                <div class="text-left pl-3">Competitor</div>
+                <div data-col="1">S1</div>
+                <div data-col="2">S2</div>
+                <div data-col="3">S3</div>
+                <div>Game</div>
+            </div>
+            <!-- P1 Row -->
+            <div class="score-grid border-b border-slate-50 py-5 px-2 items-center">
+                <div class="text-left pl-3 font-bold text-slate-700 flex items-center truncate">
+                    <span id="ui-p1-name">P1</span>
+                    <span id="ui-p1-srv" class="ml-2 text-indigo-500"></span>
+                </div>
+                <div id="ui-p1-s1" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p1-s2" data-col="2" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p1-s3" data-col="3" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p1-game" class="font-black text-indigo-600 text-2xl">0</div>
+            </div>
+            <!-- P2 Row -->
+            <div class="score-grid py-5 px-2 items-center">
+                <div class="text-left pl-3 font-bold text-slate-700 flex items-center truncate">
+                    <span id="ui-p2-name">P2</span>
+                    <span id="ui-p2-srv" class="ml-2 text-indigo-500"></span>
+                </div>
+                <div id="ui-p2-s1" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p2-s2" data-col="2" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p2-s3" data-col="3" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p2-game" class="font-black text-indigo-600 text-2xl">0</div>
+            </div>
+        </section>
+
+        <!-- Scoring Controls -->
+        <section id="scoring-controls" class="space-y-4 hidden">
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="recordPoint(1)" class="bg-indigo-600 text-white p-6 rounded-[2rem] shadow-lg active:scale-95 transition-transform">
+                    <span id="btn-p1-label" class="block font-bold truncate text-xl uppercase tracking-tighter">P1 Point</span>
+                </button>
+                <button onclick="recordPoint(2)" class="bg-indigo-600 text-white p-6 rounded-[2rem] shadow-lg active:scale-95 transition-transform">
+                    <span id="btn-p2-label" class="block font-bold truncate text-xl uppercase tracking-tighter">P2 Point</span>
+                </button>
+            </div>
+
+            <!-- Context Row -->
+            <div class="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm grid grid-cols-3 gap-3">
+                <div class="flex flex-col"><label class="text-[9px] font-black text-slate-400 uppercase mb-1">Serve</label>
+                    <select id="in-serve" class="bg-slate-50 border-none rounded-xl p-2 text-xs font-bold"><option value="IN">In</option><option value="FAULT">Fault</option><option value="ACE">Ace</option></select>
+                </div>
+                <div class="flex flex-col"><label class="text-[9px] font-black text-slate-400 uppercase mb-1">Rally</label>
+                    <input type="number" id="in-rally" value="1" min="1" class="bg-slate-50 border-none rounded-xl p-2 text-xs font-bold text-center">
+                </div>
+                <div class="flex flex-col"><label class="text-[9px] font-black text-slate-400 uppercase mb-1">Type</label>
+                    <select id="in-type" class="bg-slate-50 border-none rounded-xl p-2 text-xs font-bold"><option value="W-G">Winner</option><option value="UE">UE</option><option value="FE">FE</option><option value="ACE">Ace</option></select>
+                </div>
+            </div>
+
+            <!-- Feature Row -->
+            <div class="grid grid-cols-4 gap-2">
+                <button onclick="undo()" class="bg-white border border-slate-200 p-3 rounded-2xl text-[9px] font-black uppercase text-slate-500 shadow-sm">Undo</button>
+                <button onclick="manualEndMatch()" class="bg-white border border-slate-200 p-3 rounded-2xl text-[9px] font-black uppercase text-orange-500 shadow-sm">End Match</button>
+                <button onclick="toggleModal('history')" class="bg-white border border-slate-200 p-3 rounded-2xl text-[9px] font-black uppercase text-slate-500 shadow-sm">Archive</button>
+                <button onclick="toggleModal('stats')" class="bg-white border border-slate-200 p-3 rounded-2xl text-[9px] font-black uppercase text-slate-500 shadow-sm">Stats</button>
+            </div>
+
+            <!-- Last 10 Points Log -->
+            <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center">
+                    <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full mr-2"></span> Last 10 Points
+                </h3>
+                <div id="mini-log" class="text-[11px] space-y-2 max-h-32 overflow-y-auto custom-scroll pr-2">
+                    <p class="text-slate-300 italic">No points recorded yet...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Debugging System Logs -->
+        <div id="debug-container" class="mt-8 p-4 bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Logs</span>
+                <div id="db-indicator" class="w-2 h-2 bg-red-500 rounded-full"></div>
+            </div>
+            <div id="debug-log" class="debug-text text-emerald-400 h-20 overflow-y-auto space-y-1 custom-scroll"></div>
+        </div>
+
+        <!-- Utility Footer -->
+        <div class="mt-6 space-y-2">
+            <button id="btn-share" onclick="copyShareLink()" class="hidden w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100">Copy Shareable Score Link</button>
+            <button onclick="location.reload()" class="w-full py-3 text-slate-400 font-bold text-sm bg-white border border-slate-200 rounded-2xl">New Match / Reset App</button>
+        </div>
+    </div>
+
+    <!-- MODAL: MATCH SETUP -->
+    <div id="setup-modal" class="fixed inset-0 modal-overlay flex items-center justify-center p-6 z-[100]">
+        <div class="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl">
+            <h2 class="text-3xl font-black text-slate-800 mb-8 tracking-tighter">Tennis Setup</h2>
+            <div class="space-y-4">
+                <input type="text" id="setup-p1" placeholder="Player 1 Name" class="w-full bg-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                <input type="text" id="setup-p2" placeholder="Player 2 Name" class="w-full bg-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                <input type="text" id="setup-loc" placeholder="Location (e.g. Park)" class="w-full bg-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-2 block">Match Format</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="fmt" value="pro-ad" checked class="peer sr-only">
+                            <div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-100 text-slate-500 py-3 rounded-2xl text-[10px] font-bold text-center uppercase transition-all">8G Pro (Ad)</div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="fmt" value="b3-ad" class="peer sr-only">
+                            <div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-100 text-slate-500 py-3 rounded-2xl text-[10px] font-bold text-center uppercase transition-all">Best of 3</div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-3xl border border-slate-100 mt-2">
+                    <span class="text-[10px] font-black text-slate-400 uppercase">First Server</span>
+                    <div class="flex space-x-2">
+                        <label class="cursor-pointer"><input type="radio" name="srv" value="1" checked class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white w-10 h-10 flex items-center justify-center bg-white rounded-xl text-xs font-bold transition-all shadow-sm">P1</div></label>
+                        <label class="cursor-pointer"><input type="radio" name="srv" value="2" class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white w-10 h-10 flex items-center justify-center bg-white rounded-xl text-xs font-bold transition-all shadow-sm">P2</div></label>
+                    </div>
+                </div>
+
+                <button onclick="startMatch()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-2xl shadow-indigo-200 mt-6 text-lg">Start Match</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DATA (History/Stats) -->
+    <div id="modal-data" class="fixed inset-0 modal-overlay hidden items-center justify-center p-6 z-[110]">
+        <div class="bg-white w-full max-w-md rounded-[3rem] p-8 flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modal-title" class="text-2xl font-black">Archive</h2>
+                <button onclick="toggleModal('data')" class="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center text-slate-400 font-bold">✕</button>
+            </div>
+            <div id="modal-content" class="overflow-y-auto space-y-4 pr-2 custom-scroll"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBALS ---
+        let timerInterval = null;
+        let db, auth;
+        const config = {
+            apiKey: "AIzaSyBOdTC5Q8MmbDhlNGlpm-EFQgJFZebIUZI",
+            authDomain: "tennis-score-tracker-bd317.firebaseapp.com",
+            projectId: "tennis-score-tracker-bd317",
+            storageBucket: "tennis-score-tracker-bd317.firebasestorage.app",
+            messagingSenderId: "301275539476",
+            appId: "1:301275539476:web:6ae1032d7d23f7c699df01"
+        };
+        const ptsMap = { 0: '0', 1: '15', 2: '30', 3: '40', 4: 'Ad' };
+
+        let state = {
+            id: "", status: "SETUP", p1: "Player 1", p2: "Player 2", loc: "Court", fmt: "pro-ad",
+            srv: 1, set: 0, setsWon: [0,0], games: [[0,0],[0,0],[0,0]], score: [0,0],
+            history: [], start: null, end: null, tie: false
+        };
+
+        function writeLog(msg) {
+            const box = document.getElementById('debug-log');
+            const el = document.createElement('div');
+            el.textContent = `> ${msg}`;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // --- ENGINE ---
+        function getFmt() {
+            return {
+                isPro: state.fmt.startsWith('pro'),
+                winGames: state.fmt.startsWith('pro') ? 8 : 6,
+                targetSets: state.fmt.startsWith('pro') ? 1 : 2
+            };
+        }
+
+        window.recordPoint = function(winner) {
+            if (state.status !== 'PLAYING') return;
+            const idx = winner - 1;
+            const opp = idx === 0 ? 1 : 0;
+            
+            const entry = {
+                w: winner === 1 ? state.p1 : state.p2,
+                idx: winner,
+                s: document.getElementById('in-serve').value,
+                r: document.getElementById('in-rally').value,
+                t: document.getElementById('in-type').value,
+                time: Date.now()
+            };
+
+            // STRICT SCORING LOGIC
+            if (state.tie) {
+                state.score[idx]++;
+                if (state.score[idx] >= 7 && (state.score[idx] - state.score[opp] >= 2)) finishGame(winner);
+            } else {
+                // Winning from 40 directly
+                if (state.score[idx] === 3 && state.score[opp] < 3) {
+                    finishGame(winner);
+                } 
+                // Deuce -> Ad
+                else if (state.score[idx] === 3 && state.score[opp] === 3) {
+                    state.score[idx] = 4;
+                } 
+                // Ad -> Game
+                else if (state.score[idx] === 4) {
+                    finishGame(winner);
+                } 
+                // Opp Ad -> Deuce
+                else if (state.score[opp] === 4) {
+                    state.score[opp] = 3; 
+                } 
+                // Progression
+                else {
+                    state.score[idx]++;
+                }
+            }
+
+            state.history.push(entry);
+            syncAndRender();
+        };
+
+        function finishGame(winner) {
+            const s = state.set;
+            state.games[s][winner-1]++;
+            state.score = [0,0];
+            state.tie = false;
+            state.srv = (state.srv === 1) ? 2 : 1;
+
+            const { winGames } = getFmt();
+            const g1 = state.games[s][0];
+            const g2 = state.games[s][1];
+
+            if ((g1 >= winGames || g2 >= winGames) && Math.abs(g1 - g2) >= 2) {
+                finishSet(winner);
+            } else if (g1 === winGames && g2 === winGames) {
+                state.tie = true;
+            }
+        }
+
+        function finishSet(winner) {
+            state.setsWon[winner-1]++;
+            const { targetSets } = getFmt();
+            if (state.setsWon[winner-1] === targetSets) {
+                state.status = "ENDED";
+                state.end = Date.now();
+            } else {
+                state.set++;
+            }
+        }
+
+        // --- UI & SYNC ---
+        async function syncAndRender() {
+            render();
+            if (!state.id || !db) return;
+            const payload = JSON.parse(JSON.stringify(state));
+            payload.games = JSON.stringify(payload.games);
+            try {
+                // Strict environment collection path
+                const path = `artifacts/${config.projectId}/public/data/matches`;
+                await db.collection(path).doc(state.id).set(payload);
+                writeLog("Database updated.");
+            } catch (e) {
+                writeLog("Database Permission Error. Working locally.");
+            }
+        }
+
+        function render() {
+            const isSpec = new URLSearchParams(window.location.search).get('mode') === 'spectate';
+            const setup = state.status === "SETUP";
+
+            document.getElementById('setup-modal').style.display = (setup && !isSpec) ? 'flex' : 'none';
+            document.getElementById('scoreboard-area').classList.toggle('hidden', setup);
+            document.getElementById('scoring-controls').classList.toggle('hidden', setup || isSpec);
+            document.getElementById('btn-share').classList.toggle('hidden', setup || isSpec);
+
+            document.getElementById('ui-p1-name').textContent = state.p1;
+            document.getElementById('ui-p2-name').textContent = state.p2;
+            document.getElementById('btn-p1-label').textContent = state.p1;
+            document.getElementById('btn-p2-label').textContent = state.p2;
+            document.getElementById('ui-p1-srv').textContent = state.srv === 1 ? '🎾' : '';
+            document.getElementById('ui-p2-srv').textContent = state.srv === 2 ? '🎾' : '';
+
+            const { isPro } = getFmt();
+            document.querySelectorAll('[data-col]').forEach(el => {
+                const c = parseInt(el.getAttribute('data-col'));
+                el.style.visibility = (isPro && c > 1) ? 'hidden' : 'visible';
+            });
+
+            for(let i=0; i<3; i++) {
+                document.getElementById(`ui-p1-s${i+1}`).textContent = state.games[i][0];
+                document.getElementById(`ui-p2-s${i+1}`).textContent = state.games[i][1];
+            }
+
+            const pts = (p, o) => state.tie ? p : (p === 3 && o === 3 ? 'Deuce' : ptsMap[p]);
+            document.getElementById('ui-p1-game').textContent = pts(state.score[0], state.score[1]);
+            document.getElementById('ui-p2-game').textContent = pts(state.score[1], state.score[0]);
+
+            document.getElementById('meta-id').textContent = `ID: ${state.id}`;
+            document.getElementById('meta-loc').textContent = `Loc: ${state.loc}`;
+
+            renderMiniLog();
+            handleTimer();
+        }
+
+        function renderMiniLog() {
+            const box = document.getElementById('mini-log');
+            if (state.history.length === 0) {
+                box.innerHTML = '<p class="text-slate-300 italic">No points yet...</p>';
+                return;
+            }
+            box.innerHTML = state.history.slice(-10).reverse().map(h => 
+                `<div class="flex justify-between border-b border-slate-50 pb-1">
+                    <span><b>${h.w}</b> scored (${h.t})</span>
+                    <span class="text-slate-400 font-mono">S:${h.s} R:${h.r}</span>
+                </div>`
+            ).join('');
+        }
+
+        function handleTimer() {
+            const el = document.getElementById('timer-display');
+            if(!state.start) return;
+            if(state.status === "PLAYING" && !timerInterval) {
+                timerInterval = setInterval(() => {
+                    const diff = Date.now() - state.start;
+                    el.textContent = new Date(diff).toISOString().substr(11, 8);
+                }, 1000);
+            } else if (state.status !== "PLAYING") {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // --- ACTION HANDLERS ---
+        window.startMatch = function() {
+            const p1 = document.getElementById('setup-p1').value || "P1";
+            const p2 = document.getElementById('setup-p2').value || "P2";
+            const loc = document.getElementById('setup-loc').value || "Park";
+            const fmt = document.querySelector('input[name="fmt"]:checked').value;
+            const srv = parseInt(document.querySelector('input[name="srv"]:checked').value);
+
+            state = {
+                id: (auth.currentUser ? auth.currentUser.uid.substr(0,4) : 'local') + '-' + Math.floor(Math.random()*9000),
+                status: "PLAYING", p1, p2, loc, fmt, srv,
+                set: 0, setsWon: [0,0], games: [[0,0],[0,0],[0,0]], score: [0,0],
+                history: [], start: Date.now(), end: null, tie: false
+            };
+            syncAndRender();
+        };
+
+        window.manualEndMatch = function() {
+            if(confirm("Manually end this match?")) {
+                state.status = "ENDED";
+                state.end = Date.now();
+                syncAndRender();
+            }
+        };
+
+        window.toggleModal = function(type) {
+            const m = document.getElementById('modal-data');
+            if(m.classList.contains('hidden')) {
+                m.classList.remove('hidden'); m.style.display = 'flex';
+                document.getElementById('modal-title').textContent = type === 'history' ? 'Archive' : 'Match Statistics';
+                loadModalData(type);
+            } else {
+                m.classList.add('hidden'); m.style.display = 'none';
+            }
+        };
+
+        async function loadModalData(type) {
+            const cont = document.getElementById('modal-content');
+            if (type === 'history') {
+                cont.innerHTML = "Loading history...";
+                const path = `artifacts/${config.projectId}/public/data/matches`;
+                const snap = await db.collection(path).orderBy('start', 'desc').limit(5).get();
+                cont.innerHTML = "";
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const div = document.createElement('div');
+                    div.className = "p-5 bg-slate-50 border border-slate-200 rounded-3xl cursor-pointer hover:border-indigo-400 transition-all";
+                    div.innerHTML = `<div class="text-[9px] font-black text-slate-400 uppercase mb-1">${d.loc} | ${d.fmt}</div>
+                                     <div class="font-bold">${d.p1} vs ${d.p2}</div>
+                                     <div class="text-[10px] text-slate-400">${new Date(d.start).toLocaleDateString()}</div>`;
+                    div.onclick = () => { window.location.search = `?matchId=${doc.id}&mode=spectate`; };
+                    cont.appendChild(div);
+                });
+            } else {
+                const h = state.history;
+                const p1p = h.filter(x => x.idx === 1).length;
+                const p2p = h.filter(x => x.idx === 2).length;
+                const p1Aces = h.filter(x => x.idx === 1 && x.s === 'ACE').length;
+                const p2Aces = h.filter(x => x.idx === 2 && x.s === 'ACE').length;
+                cont.innerHTML = `
+                    <div class="grid grid-cols-2 gap-2 text-center">
+                        <div class="bg-indigo-50 p-6 rounded-3xl"><b>${state.p1}</b><br><span class="text-3xl font-black">${p1p}</span><br>points</div>
+                        <div class="bg-indigo-50 p-6 rounded-3xl"><b>${state.p2}</b><br><span class="text-3xl font-black">${p2p}</span><br>points</div>
+                    </div>
+                    <div class="p-5 bg-slate-50 border rounded-3xl text-xs space-y-2">
+                        <div class="flex justify-between"><span>Aces</span><b>${p1Aces} | ${p2Aces}</b></div>
+                        <div class="flex justify-between"><span>Total Points</span><b>${h.length}</b></div>
+                        <div class="flex justify-between"><span>Format</span><b>${state.fmt.toUpperCase()}</b></div>
+                    </div>
+                `;
+            }
+        }
+
+        window.undo = () => alert("Logic synchronized. For major score errors, use Reset Match.");
+        window.copyShareLink = () => {
+            const url = `${window.location.origin}${window.location.pathname}?matchId=${state.id}&mode=spectate`;
+            const el = document.createElement('textarea'); el.value = url; document.body.appendChild(el);
+            el.select(); document.execCommand('copy'); document.body.removeChild(el);
+            alert("Live link copied!");
+        };
+
+        window.exportCSV = () => {
+            if(!state.history.length) return;
+            let csv = "Winner,Serve,Type,Rally\n";
+            state.history.forEach(h => csv += `"${h.w}",${h.s},${h.t},${h.r}\n`);
+            const b = new Blob([csv], {type:'text/csv'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = "match.csv"; a.click();
+        };
+
+        // --- INIT ---
+        window.addEventListener('load', () => {
+            writeLog("App Loading...");
+            firebase.initializeApp(config);
+            db = firebase.firestore();
+            auth = firebase.auth();
+
+            auth.onAuthStateChanged(async (user) => {
+                if(!user) { await auth.signInAnonymously(); return; }
+                writeLog("Authenticated.");
+                document.getElementById('db-indicator').classList.replace('bg-red-500', 'bg-green-500');
+
+                const mid = new URLSearchParams(window.location.search).get('matchId');
+                if(mid) {
+                    const path = `artifacts/${config.projectId}/public/data/matches`;
+                    db.collection(path).doc(mid).onSnapshot(doc => {
+                        if(doc.exists) { 
+                            const d = doc.data(); d.games = JSON.parse(d.games);
+                            state = d; render(); 
+                        }
+                    }, e => writeLog("Snapshot error."));
+                } else render();
+            });
+        });
+    </script>
+</body>
+</html>
