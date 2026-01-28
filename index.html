@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennis Tracker Pro - Permissions Fix</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        /* Rigid 5-Column Grid System: Player Name | S1 | S2 | S3 | Game Score */
+        .score-grid {
+            display: grid;
+            grid-template-columns: 2.5fr 0.8fr 0.8fr 0.8fr 2fr;
+            align-items: center;
+            text-align: center;
+        }
+
+        .modal-overlay { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); }
+        .debug-text { font-family: 'Courier New', Courier, monospace; font-size: 11px; }
+    </style>
+
+    <!-- Firebase v8 SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen pb-12">
+
+    <div id="app-container" class="max-w-lg mx-auto px-4 pt-6">
+        <!-- Persistent Header -->
+        <header class="bg-white rounded-3xl p-6 mb-4 border border-slate-200 shadow-sm">
+            <div class="flex justify-between items-center mb-3">
+                <h1 class="text-2xl font-black text-indigo-600 tracking-tighter">Tennis Tracker</h1>
+                <div id="timer-display" class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-black font-mono">00:00:00</div>
+            </div>
+            <div class="flex justify-between text-[9px] text-slate-400 font-bold uppercase tracking-widest border-t border-slate-50 pt-3">
+                <span id="meta-id">Match: ---</span>
+                <span id="meta-loc">Loc: ---</span>
+            </div>
+        </header>
+
+        <!-- Scoreboard -->
+        <section id="scoreboard-area" class="bg-white rounded-3xl overflow-hidden mb-6 border border-slate-200 shadow-xl hidden">
+            <div class="score-grid bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest p-3">
+                <div class="text-left pl-3">Competitor</div>
+                <div>S1</div><div>S2</div><div>S3</div>
+                <div>Game</div>
+            </div>
+            <!-- P1 Row -->
+            <div class="score-grid border-b border-slate-50 py-5 px-2 items-center">
+                <div class="text-left pl-3 font-bold text-slate-700 flex items-center truncate">
+                    <span id="ui-p1-name">P1</span>
+                    <span id="ui-p1-srv" class="ml-2"></span>
+                </div>
+                <div id="ui-p1-s1" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p1-s2" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p1-s3" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p1-game" class="font-black text-indigo-600 text-2xl">0</div>
+            </div>
+            <!-- P2 Row -->
+            <div class="score-grid py-5 px-2 items-center">
+                <div class="text-left pl-3 font-bold text-slate-700 flex items-center truncate">
+                    <span id="ui-p2-name">P2</span>
+                    <span id="ui-p2-srv" class="ml-2"></span>
+                </div>
+                <div id="ui-p2-s1" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p2-s2" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p2-s3" class="font-mono text-slate-400 font-bold text-lg">0</div>
+                <div id="ui-p2-game" class="font-black text-indigo-600 text-2xl">0</div>
+            </div>
+        </section>
+
+        <!-- Scoring Controls -->
+        <section id="scoring-controls" class="space-y-4 hidden">
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="submitPoint(1)" class="bg-indigo-600 text-white p-7 rounded-[2rem] shadow-lg active:scale-95 transition-transform">
+                    <span id="btn-p1-label" class="block font-bold truncate text-xl">P1 Point</span>
+                </button>
+                <button onclick="submitPoint(2)" class="bg-indigo-600 text-white p-7 rounded-[2rem] shadow-lg active:scale-95 transition-transform">
+                    <span id="btn-p2-label" class="block font-bold truncate text-xl">P2 Point</span>
+                </button>
+            </div>
+
+            <div class="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm grid grid-cols-3 gap-3">
+                <div class="flex flex-col"><label class="text-[9px] font-black text-slate-400 uppercase mb-1">Serve</label>
+                    <select id="in-serve" class="bg-slate-50 border-none rounded-xl p-2 text-xs font-bold focus:ring-1 focus:ring-indigo-500"><option value="IN">In</option><option value="FAULT">Fault</option><option value="ACE">Ace</option></select>
+                </div>
+                <div class="flex flex-col"><label class="text-[9px] font-black text-slate-400 uppercase mb-1">Rally</label>
+                    <input type="number" id="in-rally" value="1" min="1" class="bg-slate-50 border-none rounded-xl p-2 text-xs font-bold">
+                </div>
+                <div class="flex flex-col"><label class="text-[9px] font-black text-slate-400 uppercase mb-1">Result</label>
+                    <select id="in-type" class="bg-slate-50 border-none rounded-xl p-2 text-xs font-bold focus:ring-1 focus:ring-indigo-500"><option value="W-G">Winner</option><option value="UE">Error</option><option value="ACE">Ace</option></select>
+                </div>
+            </div>
+        </section>
+
+        <!-- DEBUG BOX -->
+        <div id="debug-container" class="mt-8 p-4 bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Logs (Debug)</span>
+                <div id="db-indicator" class="w-2 h-2 bg-red-500 rounded-full"></div>
+            </div>
+            <div id="debug-log" class="debug-text text-emerald-400 h-24 overflow-y-auto space-y-1"></div>
+        </div>
+
+        <div class="mt-6 space-y-2">
+            <button id="btn-share" onclick="copyLink()" class="hidden w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-lg">Copy Live Score Link</button>
+            <button onclick="location.reload()" class="w-full py-4 text-slate-400 font-bold text-sm bg-white border border-slate-200 rounded-2xl">Reset / Reload App</button>
+        </div>
+    </div>
+
+    <!-- MODAL: MATCH SETUP -->
+    <div id="setup-modal" class="fixed inset-0 modal-overlay flex items-center justify-center p-6 z-[100]">
+        <div class="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl">
+            <h2 class="text-3xl font-black text-slate-800 mb-8 tracking-tighter text-center">Tennis Tracker</h2>
+            <div class="space-y-4">
+                <input type="text" id="p1-input" placeholder="Player 1 Name" class="w-full bg-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500">
+                <input type="text" id="p2-input" placeholder="Player 2 Name" class="w-full bg-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500">
+                <input type="text" id="loc-input" placeholder="Location (e.g. Park Court)" class="w-full bg-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500">
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="cursor-pointer"><input type="radio" name="fmt" value="pro-ad" checked class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-100 text-slate-500 py-3 rounded-2xl text-[10px] font-black text-center uppercase transition-all">8G Pro (Ad)</div></label>
+                    <label class="cursor-pointer"><input type="radio" name="fmt" value="b3-ad" class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-slate-100 text-slate-500 py-3 rounded-2xl text-[10px] font-black text-center uppercase transition-all">Best of 3</div></label>
+                </div>
+
+                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Starting Server</span>
+                    <div class="flex space-x-2">
+                        <label class="cursor-pointer"><input type="radio" name="srv" value="1" checked class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white w-10 h-10 flex items-center justify-center bg-white rounded-xl text-xs font-bold shadow-sm">P1</div></label>
+                        <label class="cursor-pointer"><input type="radio" name="srv" value="2" class="peer sr-only"><div class="peer-checked:bg-indigo-600 peer-checked:text-white w-10 h-10 flex items-center justify-center bg-white rounded-xl text-xs font-bold shadow-sm">P2</div></label>
+                    </div>
+                </div>
+
+                <button id="start-match-btn" onclick="startTheMatch()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-2xl shadow-indigo-100 mt-4 text-lg">Start Match</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- LOGGING ---
+        function writeLog(msg) {
+            const logBox = document.getElementById('debug-log');
+            const entry = document.createElement('div');
+            entry.textContent = `> ${msg}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBOdTC5Q8MmbDhlNGlpm-EFQgJFZebIUZI",
+            authDomain: "tennis-score-tracker-bd317.firebaseapp.com",
+            projectId: "tennis-score-tracker-bd317",
+            storageBucket: "tennis-score-tracker-bd317.firebasestorage.app",
+            messagingSenderId: "301275539476",
+            appId: "1:301275539476:web:6ae1032d7d23f7c699df01"
+        };
+
+        let db, auth, currentAppId;
+        let timerInterval = null;
+        const ptsMap = { 0: '0', 1: '15', 2: '30', 3: '40', 4: 'Ad' };
+
+        let matchState = {
+            id: "", status: "SETUP", p1: "P1", p2: "P2", loc: "Park", fmt: "pro-ad",
+            srv: 1, set: 0, setsWon: [0,0], games: [[0,0],[0,0],[0,0]], score: [0,0],
+            history: [], start: null, end: null, tie: false
+        };
+
+        // --- SCORING ENGINE ---
+        function calculatePoint(winner) {
+            const idx = winner - 1;
+            const opp = idx === 0 ? 1 : 0;
+            const isAd = matchState.fmt.endsWith('ad');
+
+            if (matchState.tie) {
+                matchState.score[idx]++;
+                if (matchState.score[idx] >= 7 && (matchState.score[idx] - matchState.score[opp] >= 2)) triggerGameWin(winner);
+            } else if (isAd) {
+                // STRICT TENNIS AD LOGIC
+                if (matchState.score[idx] === 3 && matchState.score[opp] < 3) triggerGameWin(winner); // Win at 40
+                else if (matchState.score[idx] === 3 && matchState.score[opp] === 3) matchState.score[idx] = 4; // Deuce -> Ad
+                else if (matchState.score[idx] === 4) triggerGameWin(winner); // Ad -> Game
+                else if (matchState.score[opp] === 4) matchState.score[opp] = 3; // Opp Ad -> Deuce
+                else matchState.score[idx]++;
+            } else {
+                if (matchState.score[idx] === 3) triggerGameWin(winner);
+                else matchState.score[idx]++;
+            }
+        }
+
+        function triggerGameWin(winner) {
+            const s = matchState.set;
+            matchState.games[s][winner-1]++;
+            matchState.score = [0,0];
+            matchState.tie = false;
+            matchState.srv = matchState.srv === 1 ? 2 : 1;
+
+            const targetG = matchState.fmt.startsWith('pro') ? 8 : 6;
+            const g1 = matchState.games[s][0];
+            const g2 = matchState.games[s][1];
+
+            if ((g1 >= targetG || g2 >= targetG) && Math.abs(g1 - g2) >= 2) {
+                matchState.setsWon[winner-1]++;
+                const targetS = matchState.fmt.startsWith('pro') ? 1 : 2;
+                if (matchState.setsWon[winner-1] === targetS) {
+                    matchState.status = "ENDED"; matchState.end = Date.now();
+                } else matchState.set++;
+            } else if (g1 === targetG && g2 === targetG) matchState.tie = true;
+        }
+
+        // --- DATABASE SYNC ---
+        async function syncToCloud() {
+            if (!matchState.id || !db) return;
+            // RULE 1: MANDATORY PATH STRUCTURE
+            const path = `artifacts/${currentAppId}/public/data/matches`;
+            
+            const payload = JSON.parse(JSON.stringify(matchState));
+            payload.games = JSON.stringify(payload.games);
+            
+            try {
+                // Ensure we are in a valid state to write
+                await db.collection(path).doc(matchState.id).set(payload);
+                writeLog("Cloud synchronized successfully.");
+            } catch (e) {
+                writeLog("Cloud Sync Error: " + e.message);
+                if (e.message.includes('permission')) {
+                    writeLog("TIP: Check your Firebase security rules for the /artifacts/ path.");
+                }
+            }
+        }
+
+        function renderInterface() {
+            const isSpec = new URLSearchParams(window.location.search).get('mode') === 'spectate';
+            const setup = matchState.status === "SETUP";
+
+            document.getElementById('setup-modal').style.display = (setup && !isSpec) ? 'flex' : 'none';
+            document.getElementById('scoreboard-area').classList.toggle('hidden', setup);
+            document.getElementById('scoring-controls').classList.toggle('hidden', setup || isSpec);
+            document.getElementById('btn-share').classList.toggle('hidden', setup || isSpec);
+
+            document.getElementById('ui-p1-name').textContent = matchState.p1;
+            document.getElementById('ui-p2-name').textContent = matchState.p2;
+            document.getElementById('btn-p1-label').textContent = matchState.p1;
+            document.getElementById('btn-p2-label').textContent = matchState.p2;
+            document.getElementById('ui-p1-srv').textContent = matchState.srv === 1 ? '🎾' : '';
+            document.getElementById('ui-p2-srv').textContent = matchState.srv === 2 ? '🎾' : '';
+
+            // Handle column visibility for Pro-Set
+            const isPro = matchState.fmt.startsWith('pro');
+            const s2Cols = document.querySelectorAll('[data-col="2"]');
+            const s3Cols = document.querySelectorAll('[data-col="3"]');
+            s2Cols.forEach(el => el.style.visibility = isPro ? 'hidden' : 'visible');
+            s3Cols.forEach(el => el.style.visibility = isPro ? 'hidden' : 'visible');
+
+            for(let i=0; i<3; i++) {
+                document.getElementById(`ui-p1-s${i+1}`).textContent = matchState.games[i][0];
+                document.getElementById(`ui-p2-s${i+1}`).textContent = matchState.games[i][1];
+            }
+
+            const getPts = (p, o) => matchState.tie ? p : (p === 3 && o === 3 ? 'Deuce' : ptsMap[p]);
+            document.getElementById('ui-p1-game').textContent = getPts(matchState.score[0], matchState.score[1]);
+            document.getElementById('ui-p2-game').textContent = getPts(matchState.score[1], matchState.score[0]);
+
+            document.getElementById('meta-id').textContent = `Match: ${matchState.id}`;
+            document.getElementById('meta-loc').textContent = `Loc: ${matchState.loc}`;
+
+            if(matchState.start && matchState.status === "PLAYING" && !timerInterval) {
+                timerInterval = setInterval(() => {
+                    const elapsed = Date.now() - matchState.start;
+                    document.getElementById('timer-display').textContent = new Date(elapsed).toISOString().substr(11, 8);
+                }, 1000);
+            }
+        }
+
+        // --- USER INTERACTIONS ---
+        window.startTheMatch = async function() {
+            writeLog("Start button clicked.");
+            const p1 = document.getElementById('p1-input').value.trim() || "Player 1";
+            const p2 = document.getElementById('p2-input').value.trim() || "Player 2";
+            const loc = document.getElementById('loc-input').value.trim() || "Court";
+            const fmt = document.querySelector('input[name="fmt"]:checked').value;
+            const srv = parseInt(document.querySelector('input[name="srv"]:checked').value);
+
+            if (!auth.currentUser) {
+                writeLog("Waiting for authentication...");
+                await auth.signInAnonymously();
+            }
+
+            matchState = {
+                id: auth.currentUser.uid.substr(0,4) + '-' + Math.floor(Math.random()*9000),
+                status: "PLAYING", p1, p2, loc, fmt, srv,
+                set: 0, setsWon: [0,0], games: [[0,0],[0,0],[0,0]], score: [0,0],
+                history: [], start: Date.now(), end: null, tie: false
+            };
+
+            writeLog("Saving match initialization...");
+            await syncToCloud();
+            renderInterface();
+        };
+
+        window.submitPoint = function(winner) {
+            calculatePoint(winner);
+            syncToCloud();
+            renderInterface();
+        };
+
+        window.copyLink = () => {
+            const url = `${window.location.origin}${window.location.pathname}?matchId=${matchState.id}&mode=spectate`;
+            const el = document.createElement('textarea'); el.value = url; document.body.appendChild(el);
+            el.select(); document.execCommand('copy'); document.body.removeChild(el);
+            alert("Spectator link copied!");
+        };
+
+        // --- INITIALIZATION ---
+        window.onload = async () => {
+            writeLog("App Loading...");
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            auth = firebase.auth();
+            currentAppId = firebaseConfig.projectId;
+
+            auth.onAuthStateChanged(async (user) => {
+                if(!user) {
+                    writeLog("Requesting authentication...");
+                    await auth.signInAnonymously();
+                    return;
+                }
+                writeLog("Auth verified: " + user.uid);
+                document.getElementById('db-indicator').classList.replace('bg-red-500', 'bg-green-500');
+
+                const mid = new URLSearchParams(window.location.search).get('matchId');
+                if(mid) {
+                    writeLog("Loading Match ID: " + mid);
+                    const path = `artifacts/${currentAppId}/public/data/matches`;
+                    db.collection(path).doc(mid).onSnapshot(doc => {
+                        if(doc.exists) {
+                            const d = doc.data();
+                            d.games = JSON.parse(d.games);
+                            matchState = d; 
+                            renderInterface();
+                        }
+                    }, err => {
+                        writeLog("Listener Error: " + err.message);
+                    });
+                } else {
+                    renderInterface();
+                }
+            });
+        };
+    </script>
+</body>
+</html>
